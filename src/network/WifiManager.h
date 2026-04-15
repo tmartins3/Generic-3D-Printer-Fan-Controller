@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "wifi_credentials.h"
 
 class WifiManager {
 public:
@@ -9,8 +10,5 @@ public:
     const char* getStatusText();
 
 private:
-    static constexpr const char* WIFI_SSID = "God24";
-    static constexpr const char* WIFI_PASSWORD = "tomasonkovajatka";
-
     char _statusText[24] = "Not Connected";
 };

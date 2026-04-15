@@ -9,3 +9,6 @@
 
 # Claude Code memory
 .claude/
+
+# WiFi credentials
+include/wifi_credentials.h
