@@ -473,6 +473,11 @@ void _loadSettingsToMenu() {
     menuDebugRecircFan.setBoolean(gSettings.debug.recircFanPresent, true);
 }
 
+void menuSyncSettings() {
+    _loadSettingsToMenu();
+    applyFanPresenceToMenu();
+}
+
 static const char* _modeShortLabel(uint8_t stateModeIndex) {
     switch (stateModeIndex) {
         case 0: return "IDLE";

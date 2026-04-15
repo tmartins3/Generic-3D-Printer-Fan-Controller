@@ -8,6 +8,7 @@
 #include "control/StateMachine.h"
 #include "menu/MenuSetup.h"
 #include "network/WifiManager.h"
+#include "debug/SerialInterface.h"
 
 // ---------------------------------------------------------------------------
 // main.cpp
@@ -28,6 +29,7 @@ static FanController heatingFan (PIN_HEATING_PWM,  PIN_HEATING_TACH,  LEDC_CH_HE
 
 static StateMachine stateMachine(exhaustFan, recircFan, heatingFan, sensors);
 static WifiManager wifiManager;
+static SerialInterface serialInterface;
 
 // ============================================================
 // Debug: print encoder and button events to serial
@@ -167,6 +169,9 @@ void setup() {
     // Initialise state machine (enters IDLE, all fans off)
     stateMachine.begin();
 
+    // Initialise serial debug interface
+    serialInterface.begin(stateMachine, exhaustFan, recircFan, heatingFan, sensors);
+
     // Draw the initial status/footer immediately instead of waiting for the
     // first scheduled display refresh.
     taskUpdateDisplayStatus();
@@ -205,6 +210,11 @@ void setup() {
     // Serial status dump every 5 seconds
     taskManager.scheduleFixedRate(5000,
                                   taskSerialStatus,
+                                  TIME_MILLIS);
+
+    // Serial command interface — poll for incoming bytes
+    taskManager.scheduleFixedRate(50,
+                                  [] { serialInterface.poll(); },
                                   TIME_MILLIS);
 
     Serial.println("[Boot] Setup complete — entering main loop");

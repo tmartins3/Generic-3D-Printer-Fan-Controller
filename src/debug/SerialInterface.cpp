@@ -1,0 +1,299 @@
+#include "SerialInterface.h"
+#include "../settings/Settings.h"
+#include "../menu/MenuSetup.h"
+#include <string.h>
+#include <stdlib.h>
+
+// ---------------------------------------------------------------------------
+// SerialInterface.cpp
+// ---------------------------------------------------------------------------
+
+void SerialInterface::begin(StateMachine&       sm,
+                            FanController&      exhaust,
+                            FanController&      recirc,
+                            FanController&      heating,
+                            TemperatureSensors& sensors) {
+    _sm      = &sm;
+    _exhaust = &exhaust;
+    _recirc  = &recirc;
+    _heating = &heating;
+    _sensors = &sensors;
+
+    Serial.println("[Serial] Debug interface ready. Type 'help' for commands.");
+}
+
+// ---------------------------------------------------------------------------
+// poll() — accumulate bytes into _buf; process on newline or carriage return
+// ---------------------------------------------------------------------------
+void SerialInterface::poll() {
+    while (Serial.available()) {
+        char c = static_cast<char>(Serial.read());
+
+        if (c == '\r') continue;   // ignore CR in CRLF pairs
+
+        if (c == '\n') {
+            _buf[_len] = '\0';
+            if (_len > 0) {
+                _processLine(_buf);
+            }
+            _len = 0;
+            return;
+        }
+
+        if (_len < BUF_SIZE - 1) {
+            _buf[_len++] = c;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// _processLine — tokenise and dispatch
+// ---------------------------------------------------------------------------
+void SerialInterface::_processLine(char* line) {
+    // Strip leading whitespace
+    while (*line == ' ') line++;
+    if (*line == '\0') return;
+
+    // First token: command
+    char* cmd = strtok(line, " ");
+    if (!cmd) return;
+
+    if (strcasecmp(cmd, "help") == 0) {
+        _cmdHelp();
+    } else if (strcasecmp(cmd, "status") == 0) {
+        _cmdStatus();
+    } else if (strcasecmp(cmd, "get") == 0) {
+        _cmdGet();
+    } else if (strcasecmp(cmd, "set") == 0) {
+        char* key = strtok(nullptr, " ");
+        char* val = strtok(nullptr, " ");
+        if (!key || !val) {
+            _err("usage: set <key> <value>");
+        } else {
+            _cmdSet(key, val);
+        }
+    } else {
+        Serial.printf("[Serial] Unknown command '%s'. Type 'help'.\n", cmd);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// help
+// ---------------------------------------------------------------------------
+void SerialInterface::_cmdHelp() {
+    Serial.println("-----------------------------------------------------");
+    Serial.println(" Serial debug interface — available commands");
+    Serial.println("-----------------------------------------------------");
+    Serial.println(" help                         this message");
+    Serial.println(" status                       live state, temps, fans");
+    Serial.println(" get                          dump all settings");
+    Serial.println(" set debug     on|off         simulated sensor mode");
+    Serial.println(" set chamber   <float °C>     debug chamber temp");
+    Serial.println(" set bed       <float °C>     debug bed temp");
+    Serial.println(" set manual    on|off         manual fan override");
+    Serial.println(" set heating   <0-100>        manual heating fan %");
+    Serial.println(" set exhaust   <0-100>        manual exhaust fan %");
+    Serial.println(" set recirc    <0-100>        manual recirc fan %");
+    Serial.println(" set mode      auto|heating|cooling");
+    Serial.println(" set mdt       <minutes>      mode decision time");
+    Serial.println(" set rfsbt     <°C>           recirc start bed temp");
+    Serial.println(" set threshold <°C>           hot chamber bed threshold");
+    Serial.println("-----------------------------------------------------");
+}
+
+// ---------------------------------------------------------------------------
+// status
+// ---------------------------------------------------------------------------
+void SerialInterface::_cmdStatus() {
+    const bool dbg = gSettings.debug.debugMode;
+
+    float bed     = dbg ? gSettings.debug.debugBedTemp     : _sensors->getBedTemp();
+    float chamber = dbg ? gSettings.debug.debugChamberTemp : _sensors->getChamberTemp();
+
+    Serial.println("-----------------------------------------------------");
+    Serial.printf(" State   : %s\n", controllerStateToString(_sm->getState()));
+    Serial.printf(" Bed     : %.1f C%s\n", bed,     dbg ? " [SIM]" : "");
+    Serial.printf(" Chamber : %.1f C%s\n", chamber, dbg ? " [SIM]" : "");
+    if (_sm->hasChamberSensorError())
+        Serial.println(" *** CHAMBER SENSOR ERROR ***");
+    Serial.println("-----------------------------------------------------");
+    Serial.printf(" Exhaust : %3d %%   %5d RPM\n",
+                  _exhaust->getSpeedPercent(), _exhaust->getRpm());
+    Serial.printf(" Recirc  : %3d %%   %5d RPM\n",
+                  _recirc->getSpeedPercent(),  _recirc->getRpm());
+    Serial.printf(" Heating : %3d %%   %5d RPM\n",
+                  _heating->getSpeedPercent(), _heating->getRpm());
+    Serial.println("-----------------------------------------------------");
+    Serial.printf(" Debug mode    : %s\n", gSettings.debug.debugMode       ? "ON" : "OFF");
+    Serial.printf(" Manual fans   : %s\n", gSettings.debug.manualFanControl ? "ON" : "OFF");
+    Serial.printf(" Op mode       : %s\n",
+                  gSettings.operatingMode == OperatingMode::Auto    ? "AUTO" :
+                  gSettings.operatingMode == OperatingMode::Heat    ? "HEATING" : "COOLING");
+    Serial.println("-----------------------------------------------------");
+}
+
+// ---------------------------------------------------------------------------
+// get — dump all settings
+// ---------------------------------------------------------------------------
+void SerialInterface::_cmdGet() {
+    Serial.println("-----------------------------------------------------");
+    Serial.println(" Settings");
+    Serial.println("-----------------------------------------------------");
+    Serial.printf(" mode          : %s\n",
+                  gSettings.operatingMode == OperatingMode::Auto    ? "auto" :
+                  gSettings.operatingMode == OperatingMode::Heat    ? "heating" : "cooling");
+    Serial.printf(" mdt           : %d min\n",  gSettings.modeDecisionTimeMin);
+    Serial.printf(" rfsbt         : %d C\n",    gSettings.recircStartBedTemp);
+    Serial.printf(" recirc speed  : %d %%\n",   gSettings.recircStartSpeed);
+    Serial.println(" -- Hot chamber --");
+    Serial.printf(" heating fan   : %d %%\n",   gSettings.hot.heatingFanSpeed);
+    Serial.printf(" hot recirc    : %d %%\n",   gSettings.hot.recircFanSpeed);
+    Serial.printf(" hot exhaust   : %d %%\n",   gSettings.hot.exhaustFanSpeed);
+    Serial.printf(" threshold     : %d C\n",    gSettings.hot.bedTempThreshold);
+    Serial.println(" -- Cold chamber --");
+    Serial.printf(" exhaust max   : %d %%\n",   gSettings.cold.exhaustFanMax);
+    Serial.printf(" exhaust min   : %d %%\n",   gSettings.cold.exhaustFanMin);
+    Serial.printf(" cold recirc   : %d %%\n",   gSettings.cold.recircFanSpeed);
+    Serial.printf(" max chamber   : %d C\n",    gSettings.cold.maxChamberTemp);
+    Serial.printf(" PID Kp/Ki/Kd  : %.2f / %.2f / %.2f\n",
+                  gSettings.cold.pidKp, gSettings.cold.pidKi, gSettings.cold.pidKd);
+    Serial.println(" -- Debug --");
+    Serial.printf(" debug         : %s\n",  gSettings.debug.debugMode       ? "on" : "off");
+    Serial.printf(" chamber sim   : %.1f C\n", gSettings.debug.debugChamberTemp);
+    Serial.printf(" bed sim       : %.1f C\n", gSettings.debug.debugBedTemp);
+    Serial.printf(" manual        : %s\n",  gSettings.debug.manualFanControl ? "on" : "off");
+    Serial.printf(" manual heat   : %d %%\n",   gSettings.debug.manualHeatingFanSpeed);
+    Serial.printf(" manual exh    : %d %%\n",   gSettings.debug.manualExhaustFanSpeed);
+    Serial.printf(" manual rec    : %d %%\n",   gSettings.debug.manualRecircFanSpeed);
+    Serial.println(" -- Fan presence --");
+    Serial.printf(" heating fan   : %s\n",  gSettings.debug.heatingFanPresent ? "yes" : "no");
+    Serial.printf(" exhaust fan   : %s\n",  gSettings.debug.exhaustFanPresent ? "yes" : "no");
+    Serial.printf(" recirc fan    : %s\n",  gSettings.debug.recircFanPresent  ? "yes" : "no");
+    Serial.println("-----------------------------------------------------");
+}
+
+// ---------------------------------------------------------------------------
+// set
+// ---------------------------------------------------------------------------
+void SerialInterface::_cmdSet(const char* key, const char* value) {
+    auto isOn  = [](const char* v) { return strcasecmp(v, "on")  == 0 || strcasecmp(v, "1") == 0; };
+    auto isOff = [](const char* v) { return strcasecmp(v, "off") == 0 || strcasecmp(v, "0") == 0; };
+
+    // --- debug mode ---
+    if (strcasecmp(key, "debug") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.debugMode = isOn(value);
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.debugMode ? "debug mode ON  (simulated temps active)"
+                                       : "debug mode OFF (using real sensors)");
+
+    // --- simulated chamber temp ---
+    } else if (strcasecmp(key, "chamber") == 0) {
+        float v = atof(value);
+        if (v < 0.0f || v > 100.0f) { _err("range 0-100 C"); return; }
+        gSettings.debug.debugChamberTemp = v;
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  chamber sim = %.1f C\n", v);
+
+    // --- simulated bed temp ---
+    } else if (strcasecmp(key, "bed") == 0) {
+        float v = atof(value);
+        if (v < 0.0f || v > 150.0f) { _err("range 0-150 C"); return; }
+        gSettings.debug.debugBedTemp = v;
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  bed sim = %.1f C\n", v);
+
+    // --- manual fan control ---
+    } else if (strcasecmp(key, "manual") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.manualFanControl = isOn(value);
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.manualFanControl ? "manual fan control ON"
+                                             : "manual fan control OFF");
+
+    // --- manual heating fan ---
+    } else if (strcasecmp(key, "heating") == 0) {
+        int v = atoi(value);
+        if (v < 0 || v > 100) { _err("range 0-100"); return; }
+        gSettings.debug.manualHeatingFanSpeed = static_cast<uint8_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  manual heating = %d %%\n", v);
+
+    // --- manual exhaust fan ---
+    } else if (strcasecmp(key, "exhaust") == 0) {
+        int v = atoi(value);
+        if (v < 0 || v > 100) { _err("range 0-100"); return; }
+        gSettings.debug.manualExhaustFanSpeed = static_cast<uint8_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  manual exhaust = %d %%\n", v);
+
+    // --- manual recirc fan ---
+    } else if (strcasecmp(key, "recirc") == 0) {
+        int v = atoi(value);
+        if (v < 0 || v > 100) { _err("range 0-100"); return; }
+        gSettings.debug.manualRecircFanSpeed = static_cast<uint8_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  manual recirc = %d %%\n", v);
+
+    // --- operating mode ---
+    } else if (strcasecmp(key, "mode") == 0) {
+        OperatingMode m;
+        if      (strcasecmp(value, "auto")    == 0) m = OperatingMode::Auto;
+        else if (strcasecmp(value, "heating") == 0) m = OperatingMode::Heat;
+        else if (strcasecmp(value, "cooling") == 0) m = OperatingMode::Cool;
+        else { _err("value must be auto, heating, or cooling"); return; }
+        gSettings.operatingMode = m;
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  mode = %s\n", value);
+
+    // --- mode decision time ---
+    } else if (strcasecmp(key, "mdt") == 0) {
+        int v = atoi(value);
+        if (v < 1 || v > 60) { _err("range 1-60 minutes"); return; }
+        gSettings.modeDecisionTimeMin = static_cast<uint16_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  mdt = %d min\n", v);
+
+    // --- recirc start bed temp ---
+    } else if (strcasecmp(key, "rfsbt") == 0) {
+        int v = atoi(value);
+        if (v < 20 || v > 100) { _err("range 20-100 C"); return; }
+        gSettings.recircStartBedTemp = static_cast<uint8_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  rfsbt = %d C\n", v);
+
+    // --- hot bed threshold ---
+    } else if (strcasecmp(key, "threshold") == 0) {
+        int v = atoi(value);
+        if (v < 20 || v > 120) { _err("range 20-120 C"); return; }
+        gSettings.hot.bedTempThreshold = static_cast<uint8_t>(v);
+        menuSyncSettings();
+        gSettings.save();
+        Serial.printf("[Serial] OK  threshold = %d C\n", v);
+
+    } else {
+        Serial.printf("[Serial] Unknown key '%s'. Type 'help'.\n", key);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+void SerialInterface::_ok(const char* msg) {
+    if (msg) Serial.printf("[Serial] OK  %s\n", msg);
+    else     Serial.println("[Serial] OK");
+}
+
+void SerialInterface::_err(const char* msg) {
+    Serial.printf("[Serial] ERR %s\n", msg);
+}

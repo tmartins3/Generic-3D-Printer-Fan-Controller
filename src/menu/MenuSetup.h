@@ -125,5 +125,9 @@ void menuSetWifiIpStatus(const char* wifiStatusText);
 uint8_t menuGetConfiguredOperatingModeIndex();
 void applyFanPresenceToMenu();
 
+// Re-sync all gSettings values back into the menu items.
+// Call this after changing gSettings from outside the menu (e.g. serial interface).
+void menuSyncSettings();
+
 // Callback fired by TcMenu when the user confirms a setting change.
 void onSettingChanged(int id);
