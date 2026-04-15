@@ -1,5 +1,8 @@
 #include "WifiManager.h"
 
+// NOTE: WiFi is not currently used in the application.
+//       Reserved for future development.
+
 #include <WiFi.h>
 
 void WifiManager::begin() {

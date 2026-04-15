@@ -1,5 +1,12 @@
 #pragma once
 
+// ---------------------------------------------------------------------------
+// WifiManager.h
+// NOTE: WiFi is not currently used in the application.
+//       This class is reserved for future development (e.g. remote monitoring,
+//       OTA updates, or a web configuration interface).
+// ---------------------------------------------------------------------------
+
 #include <Arduino.h>
 #include "wifi_credentials.h"
 
