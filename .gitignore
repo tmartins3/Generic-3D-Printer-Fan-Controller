@@ -1,0 +1,11 @@
+# PlatformIO build output
+.pio/
+
+# VSCode local settings
+.vscode/
+
+# macOS
+.DS_Store
+
+# Claude Code memory
+.claude/
