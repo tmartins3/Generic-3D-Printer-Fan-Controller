@@ -219,9 +219,9 @@ void StateMachine::_enterCooling() {
 // ---------------------------------------------------------------------------
 
 void StateMachine::_applyHeatingFanSpeeds() {
-    _exhaustFan.setSpeed(gSettings.hot.exhaustFanSpeed);
-    _recircFan.setSpeed(gSettings.debug.recircFanPresent   ? gSettings.hot.recircFanSpeed   : 0);
-    _heatingFan.setSpeed(gSettings.debug.heatingFanPresent ? gSettings.hot.heatingFanSpeed : 0);
+    _exhaustFan.setSpeed(gSettings.debug.exhaustFanPresent  ? gSettings.hot.exhaustFanSpeed  : 0);
+    _recircFan.setSpeed(gSettings.debug.recircFanPresent    ? gSettings.hot.recircFanSpeed   : 0);
+    _heatingFan.setSpeed(gSettings.debug.heatingFanPresent  ? gSettings.hot.heatingFanSpeed  : 0);
 }
 
 void StateMachine::_applyCoolingFanSpeeds() {
