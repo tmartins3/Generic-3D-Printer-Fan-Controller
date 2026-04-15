@@ -1,57 +1,184 @@
 # Generic 3D Printer Fan Controller
 
-An ESP32-based fan controller for enclosed 3D printers. Automatically manages
-heating, exhaust, and recirculation fans based on bed and chamber temperature,
-with a full on-device menu UI and persistent settings.
+An ESP32-based automatic fan controller for enclosed 3D printers. Monitors bed
+and chamber temperature and automatically manages up to three fans — a heating
+fan, an exhaust/cooling fan, and a recirculation fan — to keep the enclosure at
+the right temperature during and after a print.
+
+Any combination of one to three fans can be installed. The controller adapts its
+behaviour and hides irrelevant menu items based on which fans are configured as
+present.
 
 ---
 
-## Features
+## Authors
 
-- **Automatic mode selection** — monitors bed temperature to decide whether the
-  chamber needs active heating or cooling
-- **PID-controlled exhaust fan** in cooling mode for precise chamber temperature
-  regulation
-- **Three-fan support** — heating fan, exhaust fan, and recirculation fan, each
-  individually configurable and optionally absent
-- **On-device UI** — TcMenu-based rotary encoder interface on a colour TFT display
-- **Persistent settings** — all parameters stored in ESP32 flash, survive power cycles
-- **Debug menu** — simulate sensor values, override fan speeds manually, and tune
-  PID values without sensors connected
-- **WiFi** *(reserved for future development)* — connects and displays IP address;
-  no network API yet
+- **Tomas Martinsen** — hardware design, requirements, and real-world testing
+- **Claude Sonnet 4.6** (Anthropic) — firmware co-author
+
+---
+
+## How It Works
+
+### The Problem It Solves
+
+Enclosed 3D printers benefit from temperature management in two opposite
+directions depending on the filament being printed:
+
+- **High-temperature filaments** (ABS, ASA, PC, Nylon) need a *warm* chamber to
+  prevent warping and layer delamination. A heating fan moves heat from the warm
+  print bed up into the chamber air.
+- **Low-temperature filaments** (PLA, PETG) print better in a *cooler* chamber.
+  An exhaust fan removes hot air and replaces it with cooler room air.
+- A **recirculation fan** keeps the chamber air moving evenly regardless of mode,
+  which improves temperature uniformity and filter efficiency.
+
+This controller decides which fans to run, and at what speed, automatically —
+based on the bed temperature as a proxy for what the printer is doing.
+
+---
+
+### The Three Fans
+
+| Fan | Role | Notes |
+|-----|------|-------|
+| **Heating fan** | Moves heat from under the print bed up into the chamber | Typically a 12 V fan mounted below the bed; off in cooling mode |
+| **Exhaust fan** | Removes hot air from the chamber; regulates chamber temperature via PID in cooling mode | Typically a 24 V radial fan, often with a filter |
+| **Recirculation fan** | Circulates air inside the chamber without venting outside | Typically a 24 V radial fan with a HEPA/carbon filter |
+
+Any of the three can be omitted. Enable or disable each fan under
+**Settings → Debug → [Fan name] Present**. When a fan is marked as not present
+the controller will not drive it and related menu items are hidden.
+
+---
+
+### Control Modes
+
+The operating mode is selected under **Settings → Operating Mode**.
+
+#### AUTO (recommended)
+
+The controller observes the bed temperature and works through a fixed sequence:
+
+```
+IDLE ──► RECIRCULATING ──► HEATING ──► IDLE
+                      └──► COOLING ──► IDLE
+```
+
+**IDLE** — All fans off. The printer is idle or the bed has cooled down.
+Entered when bed temperature is below *Startup Bed Temp* (default 45 °C).
+
+**RECIRCULATING** — Only the recirculation fan runs, at *Start Recirc Fan Speed*.
+Entered when bed temperature rises above *Startup Bed Temp*. At this point
+the controller cannot yet tell whether this will be a hot-chamber or
+cold-chamber print, so it starts air circulation and begins timing the
+*Mode Decision Time* (MDT) countdown.
+
+**HEATING** — Heating fan, recirculation fan, and exhaust fan all run at the
+speeds configured under *Hot Chamber Settings*. Entered after MDT has elapsed
+if the bed temperature is at or above *Bed Threshold* (default 60 °C), meaning
+the printer is using a high-temperature material.
+
+**COOLING** — Recirculation fan runs at the cold-chamber setting. Exhaust fan
+is PID-controlled to hold chamber temperature at *Max Chamber Temp* (default
+38 °C). Heating fan is off. Entered after MDT has elapsed if bed temperature
+is below *Bed Threshold*, meaning the printer is using a low-temperature
+material.
+
+Both HEATING and COOLING return to **IDLE** when bed temperature falls below
+*Startup Bed Temp*, indicating the print has finished and the bed has cooled.
+
+> **Mode Decision Time** gives the bed time to stabilise before the controller
+> commits to a mode. A 10-minute default works well for most printers; adjust
+> it under Settings if your bed heats slowly.
+
+#### HEATING (forced)
+
+Enters HEATING mode immediately without waiting for the bed to warm up or
+the MDT to elapse. Useful when you know you are printing a high-temperature
+material and want fans on from the start.
+Returns to IDLE after MDT has elapsed *and* bed temperature has fallen below
+*Startup Bed Temp*.
+
+#### COOLING (forced)
+
+Same as forced HEATING but for cooling mode. Useful for PLA/PETG prints where
+you want exhaust running immediately.
+
+---
+
+### Manual Fan Control
+
+**Settings → Debug → Manual Fan Control → Manual Control: ON**
+
+Overrides all automatic control. Each fan can be set to any speed (0–100 %)
+independently. The state machine is suspended while manual control is active.
+Useful for testing fan wiring, benchmarking noise, or temporarily forcing
+airflow without changing operating mode.
+
+Manual control is **forced off at every boot** to prevent accidentally leaving
+fans in a stuck state after a reboot.
+
+---
+
+### Sensor Failure Handling
+
+If the chamber temperature sensor fails while in COOLING mode the exhaust fan
+runs at *Exhaust Fan Max* (100 % by default) to ensure the chamber does not
+overheat. The state machine continues to operate normally in all other
+respects.
 
 ---
 
 ## Hardware
 
-### Bill of Materials
+### What You Need
 
-| Component | Details |
-|-----------|---------|
-| Microcontroller | ESP32 (az-delivery-devkit-v4 or compatible) |
-| Display + encoder module | TFT display with rotary encoder and two buttons |
-| Display driver | ST7789 (320×240) or ST7735 — selectable in `Config.h` |
-| Exhaust fan | 24 V, 4-pin PWM radial fan |
-| Recirculation fan | 24 V, 4-pin PWM radial fan |
-| Heating fan | 12 V, 4-pin PWM fan (under-bed) |
-| Chamber temperature sensor | DS18B20 |
-| Bed temperature sensor | DS18B20 |
-| Step-down converter ×2 | 24 V → 5 V (for ESP32 + display), 24 V → 12 V (for heating fan) |
+| Component | Specification | Notes |
+|-----------|--------------|-------|
+| Microcontroller | ESP32 (az-delivery-devkit-v4 or pin-compatible) | Any ESP32 dev board with the same GPIO layout will work |
+| Display + input module | TFT colour display with rotary encoder and 2 buttons | Common combined modules sold for Arduino/ESP32 |
+| TFT controller | ST7789 (320×240) or ST7735 (128×160) | Set in `include/Config.h` |
+| Exhaust/cooling fan | 24 V, 4-pin PWM | Radial blower recommended; add a filter for particle capture |
+| Recirculation fan | 24 V, 4-pin PWM | Radial blower with HEPA/carbon filter recommended |
+| Heating fan | 12 V, 4-pin PWM | Axial or radial fan mounted below or beside the print bed |
+| Chamber temp sensor | DS18B20 | Waterproof probe version recommended; mount away from direct airflow |
+| Bed temp sensor | DS18B20 | Mount outside the fan airflow, on the underside of the bed or frame |
+| Step-down converter | 24 V → 5 V, ≥1 A | Powers ESP32 and display |
+| Step-down converter | 24 V → 12 V, rated for heating fan current | Powers the heating fan |
+| Pull-up resistors | 4.7 kΩ | One per DS18B20 1-Wire bus, between data and 3.3 V |
+| Fan power supply | 24 V DC, sufficient amperage for fans used | |
 
-> The heating fan and recirculation fan can each be marked as not present in the
-> Debug menu — the controller adapts the UI and fan outputs accordingly.
+> Only the fans you intend to install are required. The controller works with
+> any combination of one to three fans.
 
-### Pin Mapping
+---
+
+### Wiring
+
+#### Power
+
+```
+24 V supply ──► 24 V → 5 V converter ──► ESP32 5V + display VCC
+            ──► 24 V → 12 V converter ──► heating fan supply (pin 2)
+            ──► exhaust fan supply (pin 2)
+            ──► recirculation fan supply (pin 2)
+GND ──────────► all GND rails (ESP32, converters, fans) — common ground required
+```
+
+> A common ground between the ESP32 and all fan power supplies is essential.
+> Without it, PWM and tachometer signals will not be referenced correctly.
+
+#### ESP32 Pin Mapping
 
 | Signal | ESP32 GPIO |
 |--------|-----------|
-| TFT SCL (SCLK) | GPIO18 |
-| TFT SDA (MOSI) | GPIO23 |
-| TFT RES | GPIO4 |
+| TFT SCLK | GPIO18 |
+| TFT MOSI (SDA) | GPIO23 |
+| TFT Reset | GPIO4 |
 | TFT DC | GPIO16 |
 | TFT CS | GPIO17 |
-| TFT BLK (backlight) | GPIO21 |
+| TFT Backlight | GPIO21 |
 | Encoder A | GPIO32 |
 | Encoder B | GPIO33 |
 | Encoder button | GPIO25 |
@@ -62,11 +189,41 @@ with a full on-device menu UI and persistent settings.
 | Recirculation fan tach | GPIO35 |
 | Heating fan PWM | GPIO13 |
 | Heating fan tach | GPIO39 |
-| Chamber temp sensor (1-Wire) | GPIO19 |
-| Bed temp sensor (1-Wire) | GPIO22 |
+| Chamber sensor (1-Wire) | GPIO19 |
+| Bed sensor (1-Wire) | GPIO22 |
 
-> `GPIO34`, `GPIO35`, and `GPIO39` are input-only — suitable for tachometer signals.
-> Each tachometer input requires a pull-up (the ESP32 internal pull-up is sufficient).
+> GPIO34, GPIO35, and GPIO39 are input-only on ESP32 — they cannot be used
+> for output. This makes them ideal for tachometer inputs.
+
+#### 4-Pin PWM Fan Pinout
+
+Standard PC fan 4-pin connector, looking into the fan header:
+
+| Pin | Colour | Signal |
+|-----|--------|--------|
+| 1 | Black | GND |
+| 2 | Yellow | Fan supply voltage (12 V or 24 V) |
+| 3 | Green | Tachometer output (open-collector, 2 pulses/rev) |
+| 4 | Blue | PWM input (25 kHz, 3.3 V logic is accepted by most fans) |
+
+> Speed control is done via the PWM pin (pin 4). Do **not** PWM-switch the
+> supply voltage (pin 2) — this can damage the fan motor.
+>
+> The tachometer output (pin 3) is open-collector. Connect a 4.7 kΩ pull-up
+> resistor from the tach pin to 3.3 V. The ESP32 internal pull-up alone is
+> sufficient in most cases and no external resistor is needed.
+
+#### DS18B20 Temperature Sensor Wiring
+
+```
+DS18B20 VDD ──► 3.3 V
+DS18B20 GND ──► GND
+DS18B20 DQ  ──► GPIO (see pin table above)
+              └─ 4.7 kΩ pull-up to 3.3 V
+```
+
+Each sensor uses its own 1-Wire bus (separate GPIO). Do not share a bus
+between the chamber and bed sensors.
 
 ---
 
@@ -75,149 +232,123 @@ with a full on-device menu UI and persistent settings.
 ### Prerequisites
 
 - [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
-- ESP32 board connected via USB
+- ESP32 connected via USB
 
-### Clone and configure
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/tmartins3/Generic-3D-Printer-Fan-Controller.git
 cd Generic-3D-Printer-Fan-Controller
 ```
 
-Copy the WiFi credentials template and fill in your network details:
+### 2. Create WiFi credentials file
 
 ```bash
 cp include/wifi_credentials.h.example include/wifi_credentials.h
-# edit include/wifi_credentials.h with your SSID and password
 ```
 
-> WiFi is not currently used by the application. Credentials are only needed
-> to avoid a compile error — the connection is made but no network features are
-> active.
+Edit `include/wifi_credentials.h` and fill in your network name and password.
 
-### Configure display driver
+> WiFi is not currently used by the application. It is reserved for future
+> features (OTA updates, remote monitoring, web configuration). The credentials
+> file is required to compile but the connection only displays an IP address.
 
-Open `include/Config.h` and set `TFT_DRIVER_TYPE` to match your display:
+### 3. Select your display driver
+
+Open `include/Config.h` and set `TFT_DRIVER_TYPE`:
 
 ```cpp
-#define TFT_DRIVER_TYPE  DISPLAY_DRIVER_ST7789   // or DISPLAY_DRIVER_ST7735
+#define TFT_DRIVER_TYPE  DISPLAY_DRIVER_ST7789   // 320×240
+// or
+#define TFT_DRIVER_TYPE  DISPLAY_DRIVER_ST7735   // 128×160
 ```
 
-Adjust `TFT_INIT_WIDTH`, `TFT_INIT_HEIGHT`, `TFT_ROTATION`, and other display
-constants in the same file to match your module.
+Verify the rotation and inversion settings in the same file match your
+specific module.
 
-### Build and flash
+### 4. Build and upload
 
 ```bash
 pio run -t upload
 ```
 
-Serial monitor at 115200 baud:
+### 5. Open the serial monitor (optional)
 
 ```bash
 pio device monitor
 ```
 
----
-
-## Menu Structure
-
-```
-Root (live status — read only)
-├── Operating Mode      IDLE / RECIRC / HEATING / COOLING
-├── Under-bed Temp      °C
-├── Chamber Temp        °C
-├── Heating Fan Speed   %
-├── Recirculation Fan   %
-├── Exhaust Fan Speed   %
-└── WiFi IP
-
-Settings
-├── Operating Mode      AUTO / HEATING / COOLING
-├── Mode Decision Time  min
-├── Startup Bed Temp    °C
-├── Start Recirc Fan Speed  %
-├── Hot Chamber Settings
-│   ├── Heating Fan Speed   %
-│   ├── Recirculation Fan   %
-│   ├── Exhaust Fan Speed   %
-│   └── Bed Threshold       °C
-├── Cold Chamber Settings
-│   ├── Exhaust Fan Max     %
-│   ├── Exhaust Fan Min     %
-│   ├── Recirculation Fan   %
-│   └── Max Chamber Temp    °C
-└── Debug Settings
-    ├── Manual Sensor Control
-    │   ├── Debug Mode          ON/OFF
-    │   ├── Debug Chamber Temp  °C
-    │   └── Debug Bed Temp      °C
-    ├── Manual Fan Control
-    │   ├── Manual Control      ON/OFF
-    │   ├── Heating Fan Speed   %
-    │   ├── Exhaust Fan Speed   %
-    │   └── Recirculation Fan   %
-    ├── Cooling PID
-    │   ├── PID Kp
-    │   ├── PID Ki
-    │   └── PID Kd
-    ├── Heating Fan Present     YES/NO
-    ├── Exhaust Fan Present     YES/NO
-    └── Recirc Fan Present      YES/NO
-```
-
-Items are automatically hidden when the corresponding fan is marked as not present.
+Baud rate: 115200. State machine transitions, sensor readings, and fan speeds
+are logged here.
 
 ---
 
-## Control Logic
+## Settings Reference
 
-The controller runs a state machine with four states:
+All settings are persisted to flash immediately when changed.
 
-```
-IDLE ──► RECIRCULATING ──► HEATING ──► IDLE
-                      └──► COOLING ──► IDLE
-```
+### Top level
 
-| State | Condition to enter | Fan behaviour |
-|-------|--------------------|---------------|
-| **IDLE** | Bed temp below startup threshold | All fans off |
-| **RECIRCULATING** | Bed temp rises above startup threshold | Recirculation fan at start speed; Mode Decision Timer starts |
-| **HEATING** | MDT elapsed and bed temp ≥ hot threshold | Fans at hot chamber settings |
-| **COOLING** | MDT elapsed and bed temp < hot threshold | Exhaust fan PID-controlled; recirculation fan at cold setting |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Operating Mode | AUTO | AUTO / HEATING / COOLING |
+| Mode Decision Time | 10 min | How long the controller recirculates before choosing HEATING or COOLING |
+| Startup Bed Temp | 45 °C | Bed temperature that triggers the start of recirculation |
+| Start Recirc Fan Speed | 30 % | Recirculation fan speed during the decision period |
 
-All states return to **IDLE** when bed temperature falls below the startup threshold.
+### Hot Chamber Settings
 
-**Forced modes** (`HEATING` / `COOLING` selected manually): skip the recirculation
-phase and enter the selected mode immediately. Return to IDLE after MDT if the bed
-has cooled.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Heating Fan Speed | 50 % | Heating fan speed in HEATING mode |
+| Recirculation Fan | 50 % | Recirc fan speed in HEATING mode |
+| Exhaust Fan Speed | 15 % | Exhaust fan speed in HEATING mode (small amount to avoid pressure build-up) |
+| Bed Threshold | 60 °C | Bed temperature above which HEATING is chosen over COOLING |
 
-### PID Controller
+### Cold Chamber Settings
 
-The exhaust fan in COOLING mode is regulated by a PID controller targeting
-`Max Chamber Temp`. Output is clamped between `Exhaust Fan Min` and
-`Exhaust Fan Max`. The loop runs every 2 seconds. Gains are tunable in
-`Debug Settings → Cooling PID`.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Exhaust Fan Max | 100 % | PID output upper limit |
+| Exhaust Fan Min | 15 % | PID output lower limit (keeps air moving at minimum) |
+| Recirculation Fan | 20 % | Recirc fan speed in COOLING mode |
+| Max Chamber Temp | 38 °C | PID setpoint — target chamber temperature in COOLING mode |
+
+### Debug Settings
+
+| Setting | Description |
+|---------|-------------|
+| Manual Sensor Control → Debug Mode | Replaces sensor readings with the values below |
+| Manual Sensor Control → Debug Chamber Temp | Simulated chamber temperature |
+| Manual Sensor Control → Debug Bed Temp | Simulated bed temperature |
+| Manual Fan Control → Manual Control | Overrides all fan outputs |
+| Manual Fan Control → Heating / Exhaust / Recirc Fan Speed | Manual fan speed % |
+| Cooling PID → Kp / Ki / Kd | PID gains for exhaust fan in COOLING mode (default 2.0 / 0.5 / 1.0) |
+| Heating Fan Present | Mark heating fan as installed or not |
+| Exhaust Fan Present | Mark exhaust fan as installed or not |
+| Recirc Fan Present | Mark recirculation fan as installed or not |
 
 ---
 
-## Default Settings
+## On-Screen Display
 
-| Parameter | Default |
-|-----------|---------|
-| Operating mode | AUTO |
-| Mode decision time | 10 min |
-| Startup bed temp | 45 °C |
-| Start recirc fan speed | 30 % |
-| Hot — heating fan speed | 50 % |
-| Hot — recirc fan speed | 50 % |
-| Hot — exhaust fan speed | 15 % |
-| Hot — bed threshold | 60 °C |
-| Cold — exhaust max | 100 % |
-| Cold — exhaust min | 15 % |
-| Cold — recirc speed | 20 % |
-| Cold — max chamber temp | 38 °C |
-| PID Kp / Ki / Kd | 2.0 / 0.5 / 1.0 |
+The screen is split into two areas:
+
+**Menu area (top)** — standard TcMenu interface, dark theme with white text
+and blue selection highlight. Scroll with the rotary encoder; press to edit;
+press the back button (K0) to go up a level.
+
+**Status footer (bottom, 80 px)** — always visible, colour-coded by mode:
+
+| Mode | Footer colour | Label |
+|------|--------------|-------|
+| IDLE | Dark grey | `IDLE` |
+| RECIRCULATING | Teal | `RECIRC` |
+| HEATING | Red | `HEATING` or `HOT` if no heating fan |
+| COOLING | Blue | `COOLING` or `COOL` if no exhaust fan |
+
+The footer shows the current mode label and chamber temperature, for example:
+`COOLING 34 C`
 
 ---
 
@@ -225,15 +356,15 @@ The exhaust fan in COOLING mode is regulated by a PID controller targeting
 
 | Library | Purpose |
 |---------|---------|
-| [tcMenu](https://github.com/davetcc/tcMenu) | On-device menu UI |
-| [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library) | Graphics base |
-| [Adafruit ST7735/ST7789](https://github.com/adafruit/Adafruit-ST7735-Library) | Display driver |
-| [OneWire](https://github.com/PaulStoffregen/OneWire) | 1-Wire bus |
-| [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) | DS18B20 sensor |
-| [Arduino PID Library](https://github.com/br3ttb/Arduino-PID-Library) | PID controller |
+| [tcMenu](https://github.com/davetcc/tcMenu) | On-device menu UI with rotary encoder |
+| [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library) | 2D graphics base layer |
+| [Adafruit ST7735/ST7789](https://github.com/adafruit/Adafruit-ST7735-Library) | TFT display driver |
+| [OneWire](https://github.com/PaulStoffregen/OneWire) | 1-Wire bus driver |
+| [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) | DS18B20 temperature sensor |
+| [Arduino PID Library](https://github.com/br3ttb/Arduino-PID-Library) | PID controller for exhaust fan |
 
 ---
 
 ## License
 
-*TODO: add license*
+MIT License — see [LICENSE](LICENSE) for details.
