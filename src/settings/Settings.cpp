@@ -21,6 +21,7 @@ struct SettingsData {
     HotChamberSettings  hot;
     ColdChamberSettings cold;
     DebugSettings       debug;
+    NetworkSettings     network;
 };
 
 static const size_t EEPROM_SIZE = sizeof(uint16_t) + sizeof(SettingsData);
@@ -66,6 +67,9 @@ void Settings::applyDefaults() {
     debug.logIntervalMin       = 5;
 
     chamberLightOn = false;
+
+    network.ssid[0]     = '\0';
+    network.password[0] = '\0';
 }
 
 bool Settings::load() {
@@ -90,6 +94,7 @@ bool Settings::load() {
     hot                   = data.hot;
     cold                  = data.cold;
     debug                 = data.debug;
+    network               = data.network;
 
     return true;
 }
@@ -108,6 +113,7 @@ void Settings::save() {
     data.hot                  = hot;
     data.cold                 = cold;
     data.debug                = debug;
+    data.network              = network;
 
     EEPROM.put(sizeof(uint16_t), data);
     EEPROM.commit();

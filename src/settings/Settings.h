@@ -12,7 +12,7 @@
 
 // Magic key written at the start of EEPROM to detect valid data.
 // Change this value if you restructure the EEPROM layout to force a reset.
-#define SETTINGS_MAGIC  0xFC04   // bump when Settings layout changes
+#define SETTINGS_MAGIC  0xFC05   // bump when Settings layout changes
 
 // EEPROM base address used by settings (TcMenu occupies from this address)
 #define SETTINGS_EEPROM_BASE  2   // bytes 0-1 reserved for magic key
@@ -49,6 +49,11 @@ struct DebugSettings {
     uint8_t  logIntervalMin;         // minutes between log rows (default 5)
 };
 
+struct NetworkSettings {
+    char ssid[33];       // max 32 chars + null (WiFi SSID spec limit)
+    char password[65];   // max 64 chars + null (WPA2 passphrase limit)
+};
+
 // Operating mode selected by the user in the Settings menu.
 enum class OperatingMode : uint8_t {
     Auto = 0,
@@ -69,6 +74,7 @@ public:
     HotChamberSettings  hot;
     ColdChamberSettings cold;
     DebugSettings       debug;
+    NetworkSettings     network;
 
     // Initialise all fields to firmware defaults.
     Settings();
