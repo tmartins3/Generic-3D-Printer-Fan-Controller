@@ -5,9 +5,10 @@ and chamber temperature and automatically manages up to three fans — a heating
 fan, an exhaust/cooling fan, and a recirculation fan — to keep the enclosure at
 the right temperature during and after a print.
 
-Any combination of one to three fans can be installed. The controller adapts its
-behaviour and hides irrelevant menu items based on which fans are configured as
-present.
+Any combination of one to three fans can be installed. The controller also
+supports a **24 V LED chamber light** switched via a MOSFET on GPIO 5. The
+controller adapts its behaviour and hides irrelevant menu items based on which
+hardware is configured as present.
 
 ---
 
@@ -121,6 +122,58 @@ fans in a stuck state after a reboot.
 
 ---
 
+### Print Job Logging
+
+The controller logs temperature and fan data for each print job to the
+onboard flash (LittleFS).
+
+**Two log files are kept** — one for hot-chamber jobs, one for cold-chamber
+jobs. Each new completed job overwrites the previous log of the same type.
+
+**Log file names:**
+- `HOT.log` — last HEATING mode job
+- `COLD.log` — last COOLING mode job
+
+**Job lifecycle:**
+- Logging starts automatically when the state machine enters RECIRCULATING
+  (AUTO mode) or when the user forces HEATING or COOLING mode.
+- Logging ends when the state machine returns to IDLE.
+- If the device loses power mid-print the incomplete log is discarded on
+  the next boot.
+
+**Log format:**
+
+```
+# FanController2 Print Log
+# Started: 4 min since boot
+# Op Mode: AUTO
+# MDT: 10 min
+# ...all active settings...
+#
+# min;mode;bedC;chamberC;recircRPM;exhaustRPM;heatingRPM
+0;RECIRC;47.2;24.1;850;0;0
+10;HEATING;68.1;35.2;1200;300;1800
+```
+
+**Logging interval** is configured under **Settings → Debug → Logging
+Interval** (1–60 min, default 5 min).
+
+**Maximum file size** is 128 KB per file (~52 hours at 1-minute intervals).
+When the limit is reached logging stops and a truncation marker is written.
+
+**Retrieving logs via serial monitor** (115200 baud):
+
+| Command | Action |
+|---------|--------|
+| `log list` | List files with size and row count |
+| `log fetch hot` | Stream HOT.log to serial |
+| `log fetch cold` | Stream COLD.log to serial |
+| `log fetch active` | Stream in-progress log |
+| `log delete hot` | Delete HOT.log |
+| `log delete cold` | Delete COLD.log |
+
+---
+
 ### Sensor Failure Handling
 
 If the chamber temperature sensor fails while in COOLING mode the exhaust fan
@@ -142,15 +195,18 @@ respects.
 | Exhaust/cooling fan | 24 V, 4-pin PWM | Radial blower recommended; add a filter for particle capture |
 | Recirculation fan | 24 V, 4-pin PWM | Radial blower with HEPA/carbon filter recommended |
 | Heating fan | 12 V, 4-pin PWM | Axial or radial fan mounted below or beside the print bed |
+| Chamber LED strip | 24 V LED strip | Switched via N-channel MOSFET |
+| N-channel MOSFET | Logic-level, e.g. IRLZ44N | Vgs(th) ≤ 4.5 V; works at 3.3 V |
 | Chamber temp sensor | DS18B20 | Waterproof probe version recommended; mount away from direct airflow |
 | Bed temp sensor | DS18B20 | Mount outside the fan airflow, on the underside of the bed or frame |
 | Step-down converter | 24 V → 5 V, ≥1 A | Powers ESP32 and display |
 | Step-down converter | 24 V → 12 V, rated for heating fan current | Powers the heating fan |
 | Pull-up resistors | 4.7 kΩ | One per DS18B20 1-Wire bus, between data and 3.3 V |
-| Fan power supply | 24 V DC, sufficient amperage for fans used | |
+| Fan power supply | 24 V DC, sufficient amperage for fans and LED strip | |
 
-> Only the fans you intend to install are required. The controller works with
-> any combination of one to three fans.
+> All hardware except the microcontroller, display, and at least one sensor is
+> optional. The controller works with any combination of fans and with or without
+> the chamber light.
 
 ---
 
@@ -212,6 +268,46 @@ Standard PC fan 4-pin connector, looking into the fan header:
 > The tachometer output (pin 3) is open-collector. Connect a 4.7 kΩ pull-up
 > resistor from the tach pin to 3.3 V. The ESP32 internal pull-up alone is
 > sufficient in most cases and no external resistor is needed.
+
+#### Chamber Light MOSFET Wiring
+
+An N-channel logic-level MOSFET (e.g. IRLZ34N, IRLZ44N) switches the 24 V LED
+strip from the 3.3 V ESP32 GPIO.
+
+```
+                          24 V PSU (+)
+                               │
+                          LED strip (+)
+                          LED strip (–)
+                               │
+                             Drain
+                          ┌────┤  IRLZ34N (TO-220)
+ESP32 GPIO 5 ──[100 Ω]──── Gate┤
+                          └────┤
+GND ──────[10 kΩ]──────── Source
+GND ───────────────────── Source
+                               │
+                             GND (common with ESP32)
+```
+
+| MOSFET pin | Connects to |
+|------------|-------------|
+| Gate | ESP32 GPIO 5 via 100 Ω resistor |
+| Gate | GND via 10 kΩ pull-down (keeps light off during boot) |
+| Drain | LED strip negative (–) lead |
+| Source | GND (must share ground with ESP32) |
+
+LED strip positive (+) connects directly to 24 V supply.
+The MOSFET source must share a common GND with the ESP32.
+
+> **Why a pull-down on the gate?** During ESP32 boot the GPIO is floating for
+> a brief moment. The 10 kΩ resistor to GND holds the gate low so the light
+> does not flash on unintentionally at power-up.
+
+> **Heat dissipation:** At typical LED strip currents (0.5–2 A) the IRLZ34N
+> dissipates under 100 mW — no heatsink required.
+
+---
 
 #### DS18B20 Temperature Sensor Wiring
 
@@ -327,6 +423,7 @@ All settings are persisted to flash immediately when changed.
 | Heating Fan Present | Mark heating fan as installed or not |
 | Exhaust Fan Present | Mark exhaust fan as installed or not |
 | Recirc Fan Present | Mark recirculation fan as installed or not |
+| Logging Interval | 1–60 min interval for log rows (default 5 min) |
 
 ---
 
