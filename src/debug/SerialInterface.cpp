@@ -1,8 +1,10 @@
 #include "SerialInterface.h"
 #include "../settings/Settings.h"
 #include "../menu/MenuSetup.h"
+#include "../../include/Config.h"
 #include <string.h>
 #include <stdlib.h>
+#include <LittleFS.h>
 
 // ---------------------------------------------------------------------------
 // SerialInterface.cpp
@@ -72,6 +74,10 @@ void SerialInterface::_processLine(char* line) {
         } else {
             _cmdSet(key, val);
         }
+    } else if (strcasecmp(cmd, "log") == 0) {
+        char* sub = strtok(nullptr, " ");
+        char* arg = strtok(nullptr, " ");
+        _cmdLog(sub, arg);
     } else {
         Serial.printf("[Serial] Unknown command '%s'. Type 'help'.\n", cmd);
     }
@@ -98,6 +104,10 @@ void SerialInterface::_cmdHelp() {
     Serial.println(" set mdt       <minutes>      mode decision time");
     Serial.println(" set rfsbt     <°C>           recirc start bed temp");
     Serial.println(" set threshold <°C>           hot chamber bed threshold");
+    Serial.println(" set light     on|off         chamber light");
+    Serial.println(" log list                     list log files");
+    Serial.println(" log fetch hot|cold|active    stream log file to serial");
+    Serial.println(" log delete hot|cold          delete log file");
     Serial.println("-----------------------------------------------------");
 }
 
@@ -126,6 +136,7 @@ void SerialInterface::_cmdStatus() {
     Serial.println("-----------------------------------------------------");
     Serial.printf(" Debug mode    : %s\n", gSettings.debug.debugMode       ? "ON" : "OFF");
     Serial.printf(" Manual fans   : %s\n", gSettings.debug.manualFanControl ? "ON" : "OFF");
+    Serial.printf(" Chamber light : %s\n", gSettings.chamberLightOn         ? "ON" : "OFF");
     Serial.printf(" Op mode       : %s\n",
                   gSettings.operatingMode == OperatingMode::Auto    ? "AUTO" :
                   gSettings.operatingMode == OperatingMode::Heat    ? "HEATING" : "COOLING");
@@ -165,10 +176,13 @@ void SerialInterface::_cmdGet() {
     Serial.printf(" manual heat   : %d %%\n",   gSettings.debug.manualHeatingFanSpeed);
     Serial.printf(" manual exh    : %d %%\n",   gSettings.debug.manualExhaustFanSpeed);
     Serial.printf(" manual rec    : %d %%\n",   gSettings.debug.manualRecircFanSpeed);
-    Serial.println(" -- Fan presence --");
-    Serial.printf(" heating fan   : %s\n",  gSettings.debug.heatingFanPresent ? "yes" : "no");
-    Serial.printf(" exhaust fan   : %s\n",  gSettings.debug.exhaustFanPresent ? "yes" : "no");
-    Serial.printf(" recirc fan    : %s\n",  gSettings.debug.recircFanPresent  ? "yes" : "no");
+    Serial.println(" -- Hardware presence --");
+    Serial.printf(" heating fan   : %s\n",  gSettings.debug.heatingFanPresent    ? "yes" : "no");
+    Serial.printf(" exhaust fan   : %s\n",  gSettings.debug.exhaustFanPresent    ? "yes" : "no");
+    Serial.printf(" recirc fan    : %s\n",  gSettings.debug.recircFanPresent     ? "yes" : "no");
+    Serial.printf(" chamber light : %s\n",  gSettings.debug.chamberLightPresent  ? "yes" : "no");
+    Serial.println(" -- Light --");
+    Serial.printf(" light         : %s\n",  gSettings.chamberLightOn             ? "on"  : "off");
     Serial.println("-----------------------------------------------------");
 }
 
@@ -281,9 +295,89 @@ void SerialInterface::_cmdSet(const char* key, const char* value) {
         gSettings.save();
         Serial.printf("[Serial] OK  threshold = %d C\n", v);
 
+    // --- chamber light ---
+    } else if (strcasecmp(key, "light") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.chamberLightOn = isOn(value);
+        digitalWrite(PIN_CHAMBER_LIGHT, gSettings.chamberLightOn ? HIGH : LOW);
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.chamberLightOn ? "chamber light ON" : "chamber light OFF");
+
     } else {
         Serial.printf("[Serial] Unknown key '%s'. Type 'help'.\n", key);
     }
+}
+
+// ---------------------------------------------------------------------------
+// log
+// ---------------------------------------------------------------------------
+void SerialInterface::_cmdLog(const char* sub, const char* arg) {
+    if (!sub) { _err("usage: log list|fetch|delete"); return; }
+
+    // ---- list ----
+    if (strcasecmp(sub, "list") == 0) {
+        const char* paths[] = { "/active.log", "/HOT.log", "/COLD.log" };
+        Serial.println("-----------------------------------------------------");
+        Serial.println(" Log files");
+        Serial.println("-----------------------------------------------------");
+        for (const char* p : paths) {
+            if (!LittleFS.exists(p)) {
+                Serial.printf(" %-12s: not found\n", p + 1);
+                continue;
+            }
+            File f = LittleFS.open(p, "r");
+            size_t sz   = f.size();
+            int    rows = 0;
+            while (f.available()) {
+                String line = f.readStringUntil('\n');
+                if (line.length() > 0 && line[0] != '#') rows++;
+            }
+            f.close();
+            bool running = (strcmp(p, "/active.log") == 0);
+            Serial.printf(" %-12s: %6d bytes  (%d rows%s)\n",
+                          p + 1, (int)sz, rows,
+                          running ? ", running" : "");
+        }
+        Serial.println("-----------------------------------------------------");
+        return;
+    }
+
+    // ---- fetch / delete — need arg ----
+    if (!arg) { _err("usage: log fetch|delete hot|cold|active"); return; }
+
+    const char* path = nullptr;
+    if      (strcasecmp(arg, "hot")    == 0) path = "/HOT.log";
+    else if (strcasecmp(arg, "cold")   == 0) path = "/COLD.log";
+    else if (strcasecmp(arg, "active") == 0) path = "/active.log";
+    else { _err("argument must be hot, cold, or active"); return; }
+
+    // ---- fetch ----
+    if (strcasecmp(sub, "fetch") == 0) {
+        if (!LittleFS.exists(path)) { _err("file not found"); return; }
+        File f = LittleFS.open(path, "r");
+        Serial.println("-----------------------------------------------------");
+        while (f.available()) {
+            Serial.println(f.readStringUntil('\n'));
+        }
+        f.close();
+        Serial.println("-----------------------------------------------------");
+        return;
+    }
+
+    // ---- delete ----
+    if (strcasecmp(sub, "delete") == 0) {
+        if (strcasecmp(arg, "active") == 0) {
+            _err("cannot delete active log — end the print job first");
+            return;
+        }
+        if (!LittleFS.exists(path)) { _err("file not found"); return; }
+        LittleFS.remove(path);
+        Serial.printf("[Serial] OK  deleted %s\n", path + 1);
+        return;
+    }
+
+    _err("usage: log list|fetch|delete");
 }
 
 // ---------------------------------------------------------------------------

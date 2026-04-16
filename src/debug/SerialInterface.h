@@ -21,6 +21,10 @@
 //   set mdt       <minutes>       — mode decision time
 //   set rfsbt     <°C>            — recirc start bed temp (startup threshold)
 //   set threshold <°C>            — hot chamber bed temp threshold
+//   set light     on|off          — chamber light
+//   log list              — list log files with size and row count
+//   log fetch hot|cold|active — stream log file to serial
+//   log delete hot|cold   — delete log file
 // ---------------------------------------------------------------------------
 
 #include <Arduino.h>
@@ -45,6 +49,7 @@ private:
     void _cmdStatus();
     void _cmdGet();
     void _cmdSet(const char* key, const char* value);
+    void _cmdLog(const char* sub, const char* arg);
 
     static void _ok(const char* msg = nullptr);
     static void _err(const char* msg);
