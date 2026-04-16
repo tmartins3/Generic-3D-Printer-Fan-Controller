@@ -68,8 +68,9 @@ enum MenuItemId : menuid_t {
     ID_HEATING_FAN   = 4,
     ID_RECIRC_FAN    = 5,
     ID_EXHAUST_FAN   = 6,
-    ID_WIFI_IP       = 7,
-    ID_SETTINGS      = 10,
+    ID_WIFI_IP          = 7,
+    ID_CHAMBER_LIGHT    = 8,
+    ID_SETTINGS         = 10,
     ID_OP_MODE       = 11,
     ID_DECISION_TIME = 12,
     ID_RECIRC_TEMP   = 13,
@@ -101,6 +102,8 @@ enum MenuItemId : menuid_t {
     ID_DEBUG_EXHAUST_FAN   = 54,
     ID_DEBUG_RECIRC_FAN    = 55,
     ID_DEBUG_SENSOR_MENU   = 56,
+    ID_DEBUG_CHAMBER_LIGHT = 57,
+    ID_DEBUG_LOG_INTERVAL  = 58,
 };
 
 // ---------------------------------------------------------------------------
@@ -128,6 +131,10 @@ void applyFanPresenceToMenu();
 // Re-sync all gSettings values back into the menu items.
 // Call this after changing gSettings from outside the menu (e.g. serial interface).
 void menuSyncSettings();
+
+// Returns a reference to the raw Adafruit_GFX display object.
+// Used by ScreenKeyboard to draw directly on the screen.
+Adafruit_GFX& menuGetDisplay();
 
 // Callback fired by TcMenu when the user confirms a setting change.
 void onSettingChanged(int id);

@@ -132,10 +132,29 @@ const BooleanMenuInfo minfoDebugManualEnable = {
 BooleanMenuItem menuDebugManualEnable(&minfoDebugManualEnable, false, &menuDebugManualHeating, INFO_LOCATION_RAM);
 
 // Fan presence flags  (added after Manual Fan Control in the Debug menu chain)
+// WiFi IP (read-only info, moved from root to keep root clean)
+const AnyMenuInfo minfoWifiIp = {
+    "WiFi IP", ID_WIFI_IP, 0xffff, 23, NO_CALLBACK
+};
+TextMenuItem menuWifiIp(&minfoWifiIp, "Not Connected", 24, nullptr, INFO_LOCATION_RAM);
+
+// Chamber Light Present YES/NO
+const BooleanMenuInfo minfoDebugChamberLight = {
+    "Chamber Light Present", ID_DEBUG_CHAMBER_LIGHT, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuDebugChamberLight(&minfoDebugChamberLight, true, &menuWifiIp, INFO_LOCATION_RAM);
+
+const AnalogMenuInfo minfoDebugLogInterval = {
+    "Logging Interval", ID_DEBUG_LOG_INTERVAL, 0xffff, 60, onSettingChanged,
+    0, 1, "min"
+};
+AnalogMenuItem menuDebugLogInterval(&minfoDebugLogInterval, 5,
+                                    &menuDebugChamberLight, INFO_LOCATION_RAM);
+
 const BooleanMenuInfo minfoDebugRecircFan = {
     "Recirc Fan Present", ID_DEBUG_RECIRC_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
 };
-BooleanMenuItem menuDebugRecircFan(&minfoDebugRecircFan, true, nullptr, INFO_LOCATION_RAM);
+BooleanMenuItem menuDebugRecircFan(&minfoDebugRecircFan, true, &menuDebugLogInterval, INFO_LOCATION_RAM);
 
 const BooleanMenuInfo minfoDebugExhaustFan = {
     "Exhaust Fan Present", ID_DEBUG_EXHAUST_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
@@ -303,16 +322,17 @@ SubMenuItem menuSettings(&minfoSettings, &menuBackSettings, nullptr, INFO_LOCATI
 // ROOT — read-only status items
 // ===========================================================================
 
-const AnyMenuInfo minfoWifiIp = {
-    "WiFi IP", ID_WIFI_IP, 0xffff, 23, NO_CALLBACK
+// Chamber Light on/off — user-editable toggle at root level
+const BooleanMenuInfo minfoChamberLight = {
+    "Chamber Light", ID_CHAMBER_LIGHT, 0xffff, 1, onSettingChanged, NAMING_ON_OFF
 };
-TextMenuItem menuWifiIp(&minfoWifiIp, "Not Connected", 24, &menuSettings, INFO_LOCATION_RAM);
+BooleanMenuItem menuChamberLight(&minfoChamberLight, false, &menuSettings, INFO_LOCATION_RAM);
 
-// Exhaust Fan %  [RO]  — next=&menuSettings
+// Exhaust Fan %  [RO]
 const AnalogMenuInfo minfoExhaustFan = {
     "Exhaust Fan Speed", ID_EXHAUST_FAN, 0xffff, 100, NO_CALLBACK, 0, 1, "%"
 };
-AnalogMenuItem menuExhaustFan(&minfoExhaustFan, 0, &menuWifiIp, INFO_LOCATION_RAM);
+AnalogMenuItem menuExhaustFan(&minfoExhaustFan, 0, &menuChamberLight, INFO_LOCATION_RAM);
 
 // Recirc Fan %  [RO]
 const AnalogMenuInfo minfoRecircFan = {
@@ -403,6 +423,10 @@ void menuSetup() {
     // Configure renderer update rate
     renderer.setUpdatesPerSecond(10);
 
+    // Initialise chamber light GPIO — output, default off
+    pinMode(PIN_CHAMBER_LIGHT, OUTPUT);
+    digitalWrite(PIN_CHAMBER_LIGHT, LOW);
+
     // Mark RO items so TcMenu won't let the user edit them
     menuMode.setReadOnly(true);
     menuBedTemp.setReadOnly(true);
@@ -432,6 +456,9 @@ void menuSetup() {
     // Sync persisted settings into menu item values
     _loadSettingsToMenu();
     applyFanPresenceToMenu();
+
+    // Apply persisted light state
+    digitalWrite(PIN_CHAMBER_LIGHT, gSettings.chamberLightOn ? HIGH : LOW);
 
     // Show the root menu with Settings selected by default.
     menuMgr.navigateToMenu(&menuMode, &menuSettings, true);
@@ -471,6 +498,9 @@ void _loadSettingsToMenu() {
     menuDebugHeatingFan.setBoolean(gSettings.debug.heatingFanPresent, true);
     menuDebugExhaustFan.setBoolean(gSettings.debug.exhaustFanPresent, true);
     menuDebugRecircFan.setBoolean(gSettings.debug.recircFanPresent, true);
+    menuDebugChamberLight.setBoolean(gSettings.debug.chamberLightPresent, true);
+    menuDebugLogInterval.setCurrentValue(gSettings.debug.logIntervalMin, true);
+    menuChamberLight.setBoolean(gSettings.chamberLightOn, true);
 }
 
 void menuSyncSettings() {
@@ -514,6 +544,9 @@ void applyFanPresenceToMenu() {
     modeStrings[2] = hFan ? "HEATING" : "HOT";
     modeStrings[3] = cFan ? "COOLING" : "COOL";
     menuMode.setChanged(true);
+
+    // Chamber light toggle (hidden when light hardware not installed)
+    menuChamberLight.setVisible(gSettings.debug.chamberLightPresent);
 }
 
 static uint16_t _modeFooterBackground(uint8_t stateModeIndex) {
@@ -558,8 +591,11 @@ static bool _isTopLevelStatusItem(MenuItem* item) {
            item == &menuChamberTemp ||
            item == &menuHeatingFan ||
            item == &menuRecircFan ||
-           item == &menuExhaustFan ||
-           item == &menuWifiIp;
+           item == &menuExhaustFan;
+}
+
+Adafruit_GFX& menuGetDisplay() {
+    return gfx;
 }
 
 void menuSetWifiIpStatus(const char* wifiStatusText) {
@@ -680,6 +716,20 @@ void onSettingChanged(int id) {
         case ID_DEBUG_RECIRC_FAN:
             gSettings.debug.recircFanPresent = menuDebugRecircFan.getBoolean();
             applyFanPresenceToMenu();
+            break;
+        case ID_DEBUG_CHAMBER_LIGHT:
+            gSettings.debug.chamberLightPresent = menuDebugChamberLight.getBoolean();
+            applyFanPresenceToMenu();
+            break;
+        case ID_DEBUG_LOG_INTERVAL:
+            gSettings.debug.logIntervalMin =
+                static_cast<uint8_t>(menuDebugLogInterval.getCurrentValue());
+            break;
+        case ID_CHAMBER_LIGHT:
+            gSettings.chamberLightOn = menuChamberLight.getBoolean();
+            digitalWrite(PIN_CHAMBER_LIGHT, gSettings.chamberLightOn ? HIGH : LOW);
+            Serial.printf("[Menu] Chamber light: %s\n",
+                          gSettings.chamberLightOn ? "ON" : "OFF");
             break;
         default:
             return;  // Unknown id — skip save
