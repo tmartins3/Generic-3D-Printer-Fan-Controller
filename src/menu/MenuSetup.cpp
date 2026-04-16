@@ -5,6 +5,7 @@
 #include <SPI.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSansBold9pt7b.h>
+#include "../ui/ScreenKeyboard.h"
 
 #if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7735
 #include <Adafruit_ST7735.h>
@@ -34,6 +35,8 @@ static void _loadSettingsToMenu();
 static const char* _modeShortLabel(uint8_t stateModeIndex);
 static void _drawFooterStatus(uint8_t stateModeIndex, float chamberTempC);
 static bool _isTopLevelStatusItem(MenuItem* item);
+static void _onNetworkEditDone(bool accepted);
+void onNetworkEdit(int id);
 
 extern EnumMenuItem menuMode;
 extern AnalogMenuItem menuBedTemp;
@@ -131,18 +134,38 @@ const BooleanMenuInfo minfoDebugManualEnable = {
 };
 BooleanMenuItem menuDebugManualEnable(&minfoDebugManualEnable, false, &menuDebugManualHeating, INFO_LOCATION_RAM);
 
-// Fan presence flags  (added after Manual Fan Control in the Debug menu chain)
-// WiFi IP (read-only info, moved from root to keep root clean)
+// ---- Network submenu items (bottom-up: last item first) ----
+
+// WiFi IP (read-only, inside Network submenu)
 const AnyMenuInfo minfoWifiIp = {
     "WiFi IP", ID_WIFI_IP, 0xffff, 23, NO_CALLBACK
 };
-TextMenuItem menuWifiIp(&minfoWifiIp, "Not Connected", 24, nullptr, INFO_LOCATION_RAM);
+TextMenuItem menuWifiIp(&minfoWifiIp, "Not Configured", 24, nullptr, INFO_LOCATION_RAM);
+
+// WiFi Password action item
+const AnyMenuInfo minfoNetPassword = {
+    "WiFi Password", ID_NET_PASSWORD, 0xffff, 0, onNetworkEdit
+};
+ActionMenuItem menuNetPassword(&minfoNetPassword, &menuWifiIp, INFO_LOCATION_RAM);
+
+// WiFi SSID action item
+const AnyMenuInfo minfoNetSsid = {
+    "WiFi SSID", ID_NET_SSID, 0xffff, 0, onNetworkEdit
+};
+ActionMenuItem menuNetSsid(&minfoNetSsid, &menuNetPassword, INFO_LOCATION_RAM);
+
+// Network submenu
+const SubMenuInfo minfoNetwork = { "Network", ID_NET_MENU, 0xffff, 0, NO_CALLBACK };
+BackMenuItem menuBackNetwork(&minfoNetwork, &menuNetSsid, INFO_LOCATION_RAM);
+SubMenuItem menuNetwork(&minfoNetwork, &menuBackNetwork, nullptr, INFO_LOCATION_RAM);
+
+// ---- Fan presence flags ----
 
 // Chamber Light Present YES/NO
 const BooleanMenuInfo minfoDebugChamberLight = {
     "Chamber Light Present", ID_DEBUG_CHAMBER_LIGHT, 0xffff, 1, onSettingChanged, NAMING_YES_NO
 };
-BooleanMenuItem menuDebugChamberLight(&minfoDebugChamberLight, true, &menuWifiIp, INFO_LOCATION_RAM);
+BooleanMenuItem menuDebugChamberLight(&minfoDebugChamberLight, true, nullptr, INFO_LOCATION_RAM);
 
 const AnalogMenuInfo minfoDebugLogInterval = {
     "Logging Interval", ID_DEBUG_LOG_INTERVAL, 0xffff, 60, onSettingChanged,
@@ -447,7 +470,9 @@ void menuSetup() {
 
     // Finalize debug submenu ordering after all items are constructed.
     menuBackDebugPid.setNext(&menuDebugKp);
-    menuDebugPid.setNext(&menuDebugHeatingFan);
+    // Insert Network submenu into debug chain: PID → Network → HeatingFan
+    menuDebugPid.setNext(&menuNetwork);
+    menuNetwork.setNext(&menuDebugHeatingFan);
     menuMgr.addChangeNotification(&rootSelectionGuard);
 
     // Apply dark theme
@@ -506,6 +531,43 @@ void _loadSettingsToMenu() {
 void menuSyncSettings() {
     _loadSettingsToMenu();
     applyFanPresenceToMenu();
+}
+
+// ===========================================================================
+// Network editing via ScreenKeyboard
+// ===========================================================================
+
+// Static buffers for keyboard editing (must outlive the keyboard session)
+static char _netEditBuf[65];       // large enough for password (64 + null)
+static bool _editingSsid = false;  // true = editing SSID, false = editing password
+
+static void _onNetworkEditDone(bool accepted) {
+    if (accepted) {
+        if (_editingSsid) {
+            strncpy(gSettings.network.ssid, _netEditBuf, sizeof(gSettings.network.ssid));
+            gSettings.network.ssid[sizeof(gSettings.network.ssid) - 1] = '\0';
+            Serial.printf("[Menu] WiFi SSID set to: %s\n", gSettings.network.ssid);
+        } else {
+            strncpy(gSettings.network.password, _netEditBuf, sizeof(gSettings.network.password));
+            gSettings.network.password[sizeof(gSettings.network.password) - 1] = '\0';
+            Serial.println("[Menu] WiFi password updated");
+        }
+        gSettings.save();
+        wifiReconnect();
+    }
+}
+
+void onNetworkEdit(int id) {
+    if (id == ID_NET_SSID) {
+        _editingSsid = true;
+        strncpy(_netEditBuf, gSettings.network.ssid, sizeof(_netEditBuf));
+        _netEditBuf[sizeof(_netEditBuf) - 1] = '\0';
+        ScreenKeyboard::activate("WiFi SSID:", _netEditBuf, 33, _onNetworkEditDone);
+    } else if (id == ID_NET_PASSWORD) {
+        _editingSsid = false;
+        _netEditBuf[0] = '\0';   // never pre-fill password (security)
+        ScreenKeyboard::activate("WiFi Password:", _netEditBuf, 65, _onNetworkEditDone);
+    }
 }
 
 static const char* _modeShortLabel(uint8_t stateModeIndex) {

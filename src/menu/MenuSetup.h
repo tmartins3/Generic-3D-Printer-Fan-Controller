@@ -104,6 +104,9 @@ enum MenuItemId : menuid_t {
     ID_DEBUG_SENSOR_MENU   = 56,
     ID_DEBUG_CHAMBER_LIGHT = 57,
     ID_DEBUG_LOG_INTERVAL  = 58,
+    ID_NET_SSID            = 59,
+    ID_NET_PASSWORD        = 60,
+    ID_NET_MENU            = 61,
 };
 
 // ---------------------------------------------------------------------------
@@ -138,3 +141,6 @@ Adafruit_GFX& menuGetDisplay();
 
 // Callback fired by TcMenu when the user confirms a setting change.
 void onSettingChanged(int id);
+
+// Called from keyboard done callback to reconnect WiFi
+extern void wifiReconnect();
