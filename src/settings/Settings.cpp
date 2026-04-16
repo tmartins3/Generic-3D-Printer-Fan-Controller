@@ -17,6 +17,7 @@ struct SettingsData {
     uint16_t      modeDecisionTimeMin;
     uint8_t       recircStartBedTemp;
     uint8_t       recircStartSpeed;
+    bool          chamberLightOn;
     HotChamberSettings  hot;
     ColdChamberSettings cold;
     DebugSettings       debug;
@@ -58,9 +59,13 @@ void Settings::applyDefaults() {
     debug.manualHeatingFanSpeed = 0;
     debug.manualExhaustFanSpeed = 0;
     debug.manualRecircFanSpeed = 0;
-    debug.heatingFanPresent = true;
-    debug.exhaustFanPresent = true;
-    debug.recircFanPresent  = true;
+    debug.heatingFanPresent    = true;
+    debug.exhaustFanPresent    = true;
+    debug.recircFanPresent     = true;
+    debug.chamberLightPresent  = true;
+    debug.logIntervalMin       = 5;
+
+    chamberLightOn = false;
 }
 
 bool Settings::load() {
@@ -81,6 +86,7 @@ bool Settings::load() {
     modeDecisionTimeMin   = data.modeDecisionTimeMin;
     recircStartBedTemp    = data.recircStartBedTemp;
     recircStartSpeed      = data.recircStartSpeed;
+    chamberLightOn        = data.chamberLightOn;
     hot                   = data.hot;
     cold                  = data.cold;
     debug                 = data.debug;
@@ -98,6 +104,7 @@ void Settings::save() {
     data.modeDecisionTimeMin  = modeDecisionTimeMin;
     data.recircStartBedTemp   = recircStartBedTemp;
     data.recircStartSpeed     = recircStartSpeed;
+    data.chamberLightOn       = chamberLightOn;
     data.hot                  = hot;
     data.cold                 = cold;
     data.debug                = debug;

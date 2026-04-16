@@ -12,7 +12,7 @@
 
 // Magic key written at the start of EEPROM to detect valid data.
 // Change this value if you restructure the EEPROM layout to force a reset.
-#define SETTINGS_MAGIC  0xFC02
+#define SETTINGS_MAGIC  0xFC04   // bump when Settings layout changes
 
 // EEPROM base address used by settings (TcMenu occupies from this address)
 #define SETTINGS_EEPROM_BASE  2   // bytes 0-1 reserved for magic key
@@ -45,6 +45,8 @@ struct DebugSettings {
     bool     heatingFanPresent;      // false = heating fan not installed
     bool     exhaustFanPresent;      // false = exhaust fan not installed
     bool     recircFanPresent;       // false = recirculation fan not installed
+    bool     chamberLightPresent;    // false = chamber light not installed
+    uint8_t  logIntervalMin;         // minutes between log rows (default 5)
 };
 
 // Operating mode selected by the user in the Settings menu.
@@ -61,6 +63,8 @@ public:
     uint16_t      modeDecisionTimeMin; // minutes (default 10)
     uint8_t       recircStartBedTemp;  // °C (default 45)
     uint8_t       recircStartSpeed;    // % (default 30)
+
+    bool chamberLightOn;              // true = light relay/MOSFET is driven HIGH
 
     HotChamberSettings  hot;
     ColdChamberSettings cold;
