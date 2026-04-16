@@ -1,18 +1,31 @@
 #include "WifiManager.h"
-
-// NOTE: WiFi is not currently used in the application.
-//       Reserved for future development.
-
+#include "../settings/Settings.h"
 #include <WiFi.h>
 
+// ---------------------------------------------------------------------------
+// WifiManager.cpp
+// ---------------------------------------------------------------------------
+
 void WifiManager::begin() {
+    // If no SSID configured, skip WiFi entirely
+    if (gSettings.network.ssid[0] == '\0') {
+        strncpy(_statusText, "Not Configured", sizeof(_statusText));
+        _statusText[sizeof(_statusText) - 1] = '\0';
+        Serial.println("[WiFi] No SSID configured — skipping");
+        return;
+    }
+
     strncpy(_statusText, "Not Connected", sizeof(_statusText));
-    _statusText[sizeof(_statusText) - 1] = 0;
+    _statusText[sizeof(_statusText) - 1] = '\0';
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    if (gSettings.network.password[0] == '\0') {
+        WiFi.begin(gSettings.network.ssid);
+    } else {
+        WiFi.begin(gSettings.network.ssid, gSettings.network.password);
+    }
 
-    Serial.printf("[WiFi] Connecting to %s\n", WIFI_SSID);
+    Serial.printf("[WiFi] Connecting to %s\n", gSettings.network.ssid);
 
     unsigned long startMs = millis();
     while (WiFi.status() != WL_CONNECTED && (millis() - startMs) < 10000UL) {
@@ -31,17 +44,25 @@ void WifiManager::begin() {
     }
 }
 
+void WifiManager::reconnect() {
+    WiFi.disconnect(true, true);
+    begin();
+}
+
 bool WifiManager::isConnected() const {
     return WiFi.status() == WL_CONNECTED;
 }
 
 const char* WifiManager::getStatusText() {
-    if (WiFi.status() == WL_CONNECTED) {
+    if (gSettings.network.ssid[0] == '\0') {
+        strncpy(_statusText, "Not Configured", sizeof(_statusText));
+        _statusText[sizeof(_statusText) - 1] = '\0';
+    } else if (WiFi.status() == WL_CONNECTED) {
         String ip = WiFi.localIP().toString();
         ip.toCharArray(_statusText, sizeof(_statusText));
     } else {
         strncpy(_statusText, "Not Connected", sizeof(_statusText));
-        _statusText[sizeof(_statusText) - 1] = 0;
+        _statusText[sizeof(_statusText) - 1] = '\0';
     }
     return _statusText;
 }

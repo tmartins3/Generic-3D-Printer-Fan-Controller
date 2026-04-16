@@ -1,21 +1,20 @@
 #pragma once
 
+#include <Arduino.h>
+
 // ---------------------------------------------------------------------------
 // WifiManager.h
-// NOTE: WiFi is not currently used in the application.
-//       This class is reserved for future development (e.g. remote monitoring,
-//       OTA updates, or a web configuration interface).
+// Manages WiFi connection using credentials stored in gSettings.network.
+// If no SSID is configured, WiFi is skipped entirely.
 // ---------------------------------------------------------------------------
-
-#include <Arduino.h>
-#include "wifi_credentials.h"
 
 class WifiManager {
 public:
     void begin();
+    void reconnect();
     bool isConnected() const;
     const char* getStatusText();
 
 private:
-    char _statusText[24] = "Not Connected";
+    char _statusText[24] = "Not Configured";
 };
