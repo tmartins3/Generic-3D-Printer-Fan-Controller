@@ -1,4 +1,5 @@
 #include "StateMachine.h"
+#include "../logging/Logger.h"
 
 // ---------------------------------------------------------------------------
 // StateMachine.cpp
@@ -125,10 +126,12 @@ void StateMachine::update() {
                 } else if (bedTemp >= gSettings.hot.bedTempThreshold) {
                     Serial.printf("[SM] MDT expired, bed %.1f >= hot threshold %d -> HEATING\n",
                                   bedTemp, gSettings.hot.bedTempThreshold);
+                    if (_logger) _logger->notifyModeDecided(true);
                     _enterHeating();
                 } else {
                     Serial.printf("[SM] MDT expired, bed %.1f < hot threshold %d -> COOLING\n",
                                   bedTemp, gSettings.hot.bedTempThreshold);
+                    if (_logger) _logger->notifyModeDecided(false);
                     _enterCooling();
                 }
             }
@@ -164,6 +167,7 @@ void StateMachine::_enterIdle() {
     _heatingFan.setSpeed(0);
     _pid.reset();
     Serial.println("[SM] -> IDLE");
+    if (_logger) _logger->notifyJobEnd();
 }
 
 void StateMachine::_enterRecirculating() {
@@ -177,6 +181,7 @@ void StateMachine::_enterRecirculating() {
     _mdtRunning = true;
     Serial.printf("[SM] -> RECIRCULATING  (MDT %d min)\n",
                   gSettings.modeDecisionTimeMin);
+    if (_logger) _logger->notifyJobStart();
 }
 
 void StateMachine::_enterHeating() {
@@ -191,6 +196,10 @@ void StateMachine::_enterHeating() {
 
     _applyHeatingFanSpeeds();
     Serial.println("[SM] -> HEATING");
+    if (_logger && !_logger->isJobActive()) {
+        _logger->notifyJobStart();
+        _logger->notifyModeDecided(true);   // forced HEATING = HOT
+    }
 }
 
 void StateMachine::_enterCooling() {
@@ -212,6 +221,10 @@ void StateMachine::_enterCooling() {
 
     _applyCoolingFanSpeeds();
     Serial.println("[SM] -> COOLING");
+    if (_logger && !_logger->isJobActive()) {
+        _logger->notifyJobStart();
+        _logger->notifyModeDecided(false);  // forced COOLING = COLD
+    }
 }
 
 // ---------------------------------------------------------------------------

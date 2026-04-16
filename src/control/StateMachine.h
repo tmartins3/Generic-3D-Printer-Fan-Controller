@@ -6,6 +6,8 @@
 #include "../settings/Settings.h"
 #include "PidController.h"
 
+class Logger;  // forward declaration — avoids circular include
+
 // ---------------------------------------------------------------------------
 // StateMachine.h
 // Implements the four-state fan controller logic:
@@ -48,6 +50,8 @@ public:
     // True if the chamber sensor has failed (used to drive UI error indicator).
     bool hasChamberSensorError() const { return _chamberSensorError; }
 
+    void setLogger(Logger* logger) { _logger = logger; }
+
 private:
     FanController&     _exhaustFan;
     FanController&     _recircFan;
@@ -59,6 +63,7 @@ private:
     unsigned long      _mdtStartMs;   // Millis when MDT timer started
     bool               _mdtRunning;
     bool               _chamberSensorError;
+    Logger*            _logger = nullptr;
 
     // --- Internal helpers ---------------------------------------------------
 
