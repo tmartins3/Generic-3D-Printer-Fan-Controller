@@ -115,7 +115,7 @@ When file reaches 128 KB, logging stops and this line is appended:
 | Location | Settings → Debug |
 | Type | Analog (integer minutes) |
 | Range | 1–60 min |
-| Default | 1 min |
+| Default | 5 min |
 | Persisted | Yes (EEPROM with other settings) |
 | EEPROM impact | Bumps `SETTINGS_MAGIC` to `0xFC04` |
 
