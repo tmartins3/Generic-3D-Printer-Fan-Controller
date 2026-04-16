@@ -119,16 +119,25 @@ void Logger::_writeHeader() {
 void Logger::_writeRow(float bedC, float chamberC,
                         uint16_t recircRpm, uint16_t exhaustRpm,
                         uint16_t heatingRpm, ControllerState state) {
+    // Check size before opening for append to avoid writing past the limit
+    {
+        File check = LittleFS.open(PATH_ACTIVE, "r");
+        size_t sz = check ? check.size() : 0;
+        if (check) check.close();
+        if (sz >= LOG_MAX_BYTES) {
+            File f = LittleFS.open(PATH_ACTIVE, "a");
+            if (f) {
+                f.printf("# LOG TRUNCATED AT %luKB\n", LOG_MAX_BYTES / 1024UL);
+                f.close();
+            }
+            _truncated = true;
+            Serial.println("[Log] File size limit reached — logging stopped");
+            return;
+        }
+    }
+
     File f = LittleFS.open(PATH_ACTIVE, "a");
     if (!f) return;
-
-    if (f.size() >= LOG_MAX_BYTES) {
-        f.printf("# LOG TRUNCATED AT %luKB\n", LOG_MAX_BYTES / 1024UL);
-        f.close();
-        _truncated = true;
-        Serial.println("[Log] File size limit reached — logging stopped");
-        return;
-    }
 
     f.printf("%lu;%s;%.1f;%.1f;%u;%u;%u\n",
              _elapsedMin(), _stateStr(state),
