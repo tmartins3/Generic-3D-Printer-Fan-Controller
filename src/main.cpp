@@ -9,6 +9,7 @@
 #include "menu/MenuSetup.h"
 #include "network/WifiManager.h"
 #include "debug/SerialInterface.h"
+#include "logging/Logger.h"
 
 // ---------------------------------------------------------------------------
 // main.cpp
@@ -30,6 +31,7 @@ static FanController heatingFan (PIN_HEATING_PWM,  PIN_HEATING_TACH,  LEDC_CH_HE
 static StateMachine stateMachine(exhaustFan, recircFan, heatingFan, sensors);
 static WifiManager wifiManager;
 static SerialInterface serialInterface;
+static Logger logger;
 
 // ============================================================
 // Debug: print encoder and button events to serial
@@ -110,6 +112,21 @@ static void taskUpdateFooter() {
 }
 
 // ============================================================
+// Periodic task: log tick (fires every 60 s; Logger checks interval internally)
+// ============================================================
+static void taskLogTick() {
+    float bedC = gSettings.debug.debugMode
+               ? gSettings.debug.debugBedTemp
+               : sensors.getBedTemp();
+    float chamberC = gSettings.debug.debugMode
+                   ? gSettings.debug.debugChamberTemp
+                   : sensors.getChamberTemp();
+    logger.tick(bedC, chamberC,
+                recircFan.getRpm(), exhaustFan.getRpm(), heatingFan.getRpm(),
+                stateMachine.getState());
+}
+
+// ============================================================
 // Periodic task: serial status dump (debug convenience)
 // ============================================================
 static void taskSerialStatus() {
@@ -168,6 +185,8 @@ void setup() {
 
     // Initialise state machine (enters IDLE, all fans off)
     stateMachine.begin();
+    logger.begin();
+    stateMachine.setLogger(&logger);
 
     // Initialise serial debug interface
     serialInterface.begin(stateMachine, exhaustFan, recircFan, heatingFan, sensors);
@@ -216,6 +235,9 @@ void setup() {
     taskManager.scheduleFixedRate(50,
                                   [] { serialInterface.poll(); },
                                   TIME_MILLIS);
+
+    // Logger tick — fires every 60 s; Logger checks interval internally
+    taskManager.scheduleFixedRate(60000, taskLogTick, TIME_MILLIS);
 
     Serial.println("[Boot] Setup complete — entering main loop");
 }
