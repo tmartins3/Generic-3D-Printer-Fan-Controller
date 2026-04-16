@@ -10,6 +10,7 @@
 #include "network/WifiManager.h"
 #include "debug/SerialInterface.h"
 #include "logging/Logger.h"
+#include "network/StatusWebServer.h"
 
 // ---------------------------------------------------------------------------
 // main.cpp
@@ -32,6 +33,8 @@ static StateMachine stateMachine(exhaustFan, recircFan, heatingFan, sensors);
 static WifiManager wifiManager;
 static SerialInterface serialInterface;
 static Logger logger;
+static StatusWebServer webServer;
+static bool webServerStarted = false;
 
 // ============================================================
 // Debug: print encoder and button events to serial
@@ -148,6 +151,22 @@ static void taskSerialStatus() {
 }
 
 // ============================================================
+// wifiReconnect — called from menu after keyboard edits credentials
+// ============================================================
+void wifiReconnect() {
+    wifiManager.reconnect();
+    menuSetWifiIpStatus(wifiManager.getStatusText());
+    if (wifiManager.isConnected() && !webServerStarted) {
+        webServer.begin();
+        taskManager.scheduleFixedRate(50,
+                                      [] { webServer.handleClient(); },
+                                      TIME_MILLIS);
+        webServerStarted = true;
+    }
+    Serial.printf("[WiFi] Reconnect: %s\n", wifiManager.getStatusText());
+}
+
+// ============================================================
 // setup()
 // ============================================================
 void setup() {
@@ -178,6 +197,12 @@ void setup() {
 
     // Initialise Wi-Fi independently from the control logic.
     wifiManager.begin();
+
+    // Start HTTP status server (only useful when WiFi is connected)
+    if (wifiManager.isConnected()) {
+        webServer.begin();
+        webServerStarted = true;
+    }
 
     // Initialise TcMenu display + encoder
     menuSetup();
@@ -238,6 +263,13 @@ void setup() {
 
     // Logger tick — fires every 60 s; Logger checks interval internally
     taskManager.scheduleFixedRate(60000, taskLogTick, TIME_MILLIS);
+
+    // HTTP server — poll for incoming requests
+    if (webServerStarted) {
+        taskManager.scheduleFixedRate(50,
+                                      [] { webServer.handleClient(); },
+                                      TIME_MILLIS);
+    }
 
     Serial.println("[Boot] Setup complete — entering main loop");
 }
