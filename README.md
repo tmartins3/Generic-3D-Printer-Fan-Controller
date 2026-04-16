@@ -174,6 +174,25 @@ When the limit is reached logging stops and a truncation marker is written.
 
 ---
 
+### Web Status Page
+
+When WiFi is connected, the controller serves a plain-text status page at
+`http://<device-ip>/` (port 80). The page contains:
+
+- All current settings (operating mode, fan speeds, PID values, etc.)
+- The contents of HOT.log (last hot-chamber print)
+- The contents of COLD.log (last cold-chamber print)
+
+If a log file does not exist, `LOGFILE NOT PRESENT` is shown in its place.
+
+The device IP is displayed on the menu screen under **Settings → Debug →
+WiFi IP** and printed to serial at boot.
+
+No additional libraries are required — the web server uses the built-in
+ESP32 `WebServer` library.
+
+---
+
 ### Sensor Failure Handling
 
 If the chamber temperature sensor fails while in COOLING mode the exhaust fan
@@ -337,17 +356,15 @@ git clone https://github.com/tmartins3/Generic-3D-Printer-Fan-Controller.git
 cd Generic-3D-Printer-Fan-Controller
 ```
 
-### 2. Create WiFi credentials file
+### 2. Configure WiFi (on device)
 
-```bash
-cp include/wifi_credentials.h.example include/wifi_credentials.h
-```
+WiFi credentials are entered on the device itself using the on-screen
+keyboard. Navigate to **Settings → Debug → Network** and edit the SSID
+and password. Credentials are saved to flash and persist across reboots.
 
-Edit `include/wifi_credentials.h` and fill in your network name and password.
-
-> WiFi is not currently used by the application. It is reserved for future
-> features (OTA updates, remote monitoring, web configuration). The credentials
-> file is required to compile but the connection only displays an IP address.
+> A `wifi_credentials.h` file is no longer required. If you previously
+> used one, the device will prompt for new credentials after this update
+> (EEPROM layout has changed).
 
 ### 3. Select your display driver
 

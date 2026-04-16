@@ -240,12 +240,15 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
   - Cooling exhaust fan PID control is implemented and PID values are configurable
   - Debug mode allows simulated bed and chamber temperatures without sensors connected
   - Manual fan override is available from the debug menu for all three fans
-  - Wi-Fi connects with the current hardcoded credentials and shows the IP address on the first menu level
+  - Wi-Fi credentials are configured via on-screen keyboard
+    (Settings → Debug → Network) and persisted to EEPROM
   - Startup now forces debug mode and manual fan control off, avoiding stale manual outputs after reboot
+  - HTTP status page at `http://<device-ip>/` returns a plain-text
+    dump of all settings plus HOT.log and COLD.log contents (uses
+    built-in ESP32 WebServer library, no extra dependencies)
 - In progress:
   - Real-hardware validation with fans and sensors connected
 - Not started:
-  - Persistent Wi-Fi configuration and any network API beyond status display
 - Known bugs:
   - None currently documented in this file
 
@@ -264,12 +267,6 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - Display/UI style preferences:
   - Dark theme, modern look
   - White text on dark background, bold text where supported
-- Code style preferences:
-  - Add comments and use good naming
-  - Standard Arduino code conventions
-  - Exception: use camelCase or CamelCase (Java style)
-  - Divide into reasonably sized files by functionality
-  - Use C++ classes where applicable
 
 ## File Map
 
@@ -281,6 +278,8 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - `src/control/StateMachine.h/.cpp` — IDLE / RECIRCULATING / HEATING / COOLING logic
 - `src/control/PidController.h/.cpp` — PID wrapper around Arduino-PID-Library
 - `src/settings/Settings.h/.cpp` — All persisted settings, EEPROM load/save
+- `src/network/WifiManager.h/.cpp` — WiFi connection management
+- `src/network/StatusWebServer.h/.cpp` — HTTP status page (settings + log files)
 - `include/` — Shared headers and pin/constant definitions
 - `lib/` — Local libraries (empty for now; all deps via PlatformIO)
 - `test/` — Unit tests (PlatformIO native env)
@@ -309,5 +308,15 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - The main status/footer update paths are split:
   - normal read-only menu status refresh runs at `500 ms`
   - large footer refresh runs at `5 s`
+
+## Coding style and strategy
+- Always update this document if new functionality is added
+- When naming file, classes, variables. Then the name consists of two parts, always start the name with the primary descrption. An example: Do not name as: TemperatureLogger but LoggerTemperature as the "Logger" word is the main defining role of the object/file.
+- prioritise simplicity always, secondy separation of concerns. All software should consist of separate "services" invoked from the main logic/function.
+- Add comments and use good naming
+- Standard Arduino code conventions
+- Exception: use camelCase or CamelCase (Java style)
+- Divide into reasonably sized files by functionality
+- Use C++ classes where applicable
 
 ## TODO
