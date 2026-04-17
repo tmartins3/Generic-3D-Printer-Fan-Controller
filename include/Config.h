@@ -83,6 +83,10 @@
 // Sentinel value returned when a sensor read fails
 #define TEMP_READ_ERROR    -127.0f
 
+// --- Chamber Light (24V LED strip via N-channel logic-level MOSFET) ----------
+// GPIO 5 → 100 Ω → MOSFET gate. Add 10 kΩ gate-to-GND pull-down on the PCB.
+#define PIN_CHAMBER_LIGHT   5
+
 // --- Serial Debug ------------------------------------------------------------
 #define SERIAL_BAUD        115200
 

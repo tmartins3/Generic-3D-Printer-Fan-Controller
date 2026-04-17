@@ -11,6 +11,7 @@
 #include "debug/SerialInterface.h"
 #include "logging/Logger.h"
 #include "network/StatusWebServer.h"
+#include "ui/ScreenKeyboard.h"
 
 // ---------------------------------------------------------------------------
 // main.cpp
@@ -88,7 +89,21 @@ static void taskUpdateTach() {
 // ============================================================
 // Periodic task: refresh read-only display items
 // ============================================================
+static bool _kbWasActive = false;   // tracks keyboard→normal transition
+
 static void taskUpdateDisplayStatus() {
+    if (ScreenKeyboard::isActive()) {
+        _kbWasActive = true;
+        return;   // keyboard owns the display
+    }
+    // Keyboard just closed — force immediate footer redraw
+    if (_kbWasActive) {
+        _kbWasActive = false;
+        float ct = gSettings.debug.debugMode
+                 ? gSettings.debug.debugChamberTemp
+                 : sensors.getChamberTemp();
+        menuUpdateFooterStatus(static_cast<uint8_t>(stateMachine.getState()), ct);
+    }
     uint8_t modeIdx = static_cast<uint8_t>(stateMachine.getState());
 
     float bedTemp     = gSettings.debug.debugMode
@@ -108,6 +123,7 @@ static void taskUpdateDisplayStatus() {
 }
 
 static void taskUpdateFooter() {
+    if (ScreenKeyboard::isActive()) return;   // keyboard owns the display
     float chamberTemp = gSettings.debug.debugMode
                       ? gSettings.debug.debugChamberTemp
                       : sensors.getChamberTemp();

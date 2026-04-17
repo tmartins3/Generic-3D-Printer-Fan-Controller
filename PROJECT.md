@@ -140,6 +140,12 @@ Describe how the firmware should behave.
       - PID `Kp`
       - PID `Ki`
       - PID `Kd`
+    - Network
+      - SSID 2.4G (text item, shows current SSID,
+        launches T9 keyboard on click)
+      - Password (text item, shows "Is set" / "Not set",
+        launches T9 keyboard on click)
+      - WiFi IP (`RO`)
     - Manual Fan Control
       - Manual Control ON/OFF
       - Under-bed fan speed %
@@ -240,8 +246,13 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
   - Cooling exhaust fan PID control is implemented and PID values are configurable
   - Debug mode allows simulated bed and chamber temperatures without sensors connected
   - Manual fan override is available from the debug menu for all three fans
-  - Wi-Fi credentials are configured via on-screen keyboard
+  - Wi-Fi credentials are configured via full-screen T9 on-screen keyboard
     (Settings → Debug → Network) and persisted to EEPROM
+  - SSID menu item displays the currently configured SSID;
+    password item shows "Is set" / "Not set"
+  - The ESP32 only supports 2.4 GHz WiFi (no 5 GHz)
+  - TcMenu's built-in text editor is blocked for network
+    items; the custom T9 keyboard is used instead
   - Startup now forces debug mode and manual fan control off, avoiding stale manual outputs after reboot
   - HTTP status page at `http://<device-ip>/` returns a plain-text
     dump of all settings plus HOT.log and COLD.log contents (uses
@@ -280,6 +291,9 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - `src/settings/Settings.h/.cpp` — All persisted settings, EEPROM load/save
 - `src/network/WifiManager.h/.cpp` — WiFi connection management
 - `src/network/StatusWebServer.h/.cpp` — HTTP status page (settings + log files)
+- `src/ui/ScreenKeyboard.h/.cpp` — Full-screen T9 on-screen keyboard
+- `src/debug/SerialInterface.h/.cpp` — Serial command interface
+- `src/logging/Logger.h/.cpp` — Print job logging to LittleFS
 - `include/` — Shared headers and pin/constant definitions
 - `lib/` — Local libraries (empty for now; all deps via PlatformIO)
 - `test/` — Unit tests (PlatformIO native env)
@@ -304,7 +318,9 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - `GPIO34`, `GPIO35`, `GPIO39` are input-only — used for tachometer inputs only.
 - Debug mode replaces hardware sensor reads with values set in the Debug settings
   menu, allowing testing without sensors connected.
-- Wi-Fi credentials are currently hardcoded in `src/network/WifiManager.cpp`.
+- Wi-Fi credentials are entered via the on-screen T9 keyboard
+  (Settings → Debug → Network) and persisted to EEPROM.
+  The ESP32 supports 2.4 GHz WiFi only.
 - The main status/footer update paths are split:
   - normal read-only menu status refresh runs at `500 ms`
   - large footer refresh runs at `5 s`

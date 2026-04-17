@@ -55,7 +55,14 @@ const ConnectorLocalInfo applicationInfo = { "FanController", "fan-ctrl-esp32-00
 class RootSelectionGuard : public MenuManagerObserver {
 public:
     void structureHasChanged() override {}
-    bool menuEditStarting(MenuItem* item) override { return true; }
+    bool menuEditStarting(MenuItem* item) override {
+        // Block TcMenu's built-in text editor for items that use our keyboard
+        if (item->getId() == ID_NET_SSID || item->getId() == ID_NET_PASSWORD) {
+            onNetworkEdit(item->getId());
+            return false;   // prevent TcMenu's editor
+        }
+        return true;
+    }
     void menuEditEnded(MenuItem* item) override {}
 
     void activeItemHasChanged(MenuItem* newActive) override {
@@ -142,17 +149,17 @@ const AnyMenuInfo minfoWifiIp = {
 };
 TextMenuItem menuWifiIp(&minfoWifiIp, "Not Configured", 24, nullptr, INFO_LOCATION_RAM);
 
-// WiFi Password action item
+// WiFi Password text item — shows "Is set" / "Not set"
 const AnyMenuInfo minfoNetPassword = {
-    "WiFi Password", ID_NET_PASSWORD, 0xffff, 0, onNetworkEdit
+    "Password", ID_NET_PASSWORD, 0xffff, 8, onNetworkEdit
 };
-ActionMenuItem menuNetPassword(&minfoNetPassword, &menuWifiIp, INFO_LOCATION_RAM);
+TextMenuItem menuNetPassword(&minfoNetPassword, "Not set", 8, &menuWifiIp, INFO_LOCATION_RAM);
 
-// WiFi SSID action item
+// WiFi SSID text item — shows current SSID, click to edit via on-screen keyboard
 const AnyMenuInfo minfoNetSsid = {
-    "WiFi SSID", ID_NET_SSID, 0xffff, 0, onNetworkEdit
+    "SSID 2.4G", ID_NET_SSID, 0xffff, 33, onNetworkEdit
 };
-ActionMenuItem menuNetSsid(&minfoNetSsid, &menuNetPassword, INFO_LOCATION_RAM);
+TextMenuItem menuNetSsid(&minfoNetSsid, "", 33, &menuNetPassword, INFO_LOCATION_RAM);
 
 // Network submenu
 const SubMenuInfo minfoNetwork = { "Network", ID_NET_MENU, 0xffff, 0, NO_CALLBACK };
@@ -526,6 +533,11 @@ void _loadSettingsToMenu() {
     menuDebugChamberLight.setBoolean(gSettings.debug.chamberLightPresent, true);
     menuDebugLogInterval.setCurrentValue(gSettings.debug.logIntervalMin, true);
     menuChamberLight.setBoolean(gSettings.chamberLightOn, true);
+
+    // Show current SSID in the text item
+    menuNetSsid.setTextValue(gSettings.network.ssid, true);
+    menuNetPassword.setTextValue(
+        gSettings.network.password[0] ? "Is set" : "Not set", true);
 }
 
 void menuSyncSettings() {
@@ -555,6 +567,10 @@ static void _onNetworkEditDone(bool accepted) {
         gSettings.save();
         wifiReconnect();
     }
+    // Always restore display text (TcMenu's editor may have overwritten it)
+    menuNetSsid.setTextValue(gSettings.network.ssid, true);
+    menuNetPassword.setTextValue(
+        gSettings.network.password[0] ? "Is set" : "Not set", true);
 }
 
 void onNetworkEdit(int id) {

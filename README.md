@@ -15,7 +15,7 @@ hardware is configured as present.
 ## Authors
 
 - **Tomas Martinsen** — hardware design, requirements, and real-world testing
-- **Claude Sonnet 4.6** (Anthropic) — firmware co-author
+- **Claude Sonnet 4.6 / Opus 4.6** (Anthropic) — firmware co-author
 
 ---
 
@@ -186,7 +186,7 @@ When WiFi is connected, the controller serves a plain-text status page at
 If a log file does not exist, `LOGFILE NOT PRESENT` is shown in its place.
 
 The device IP is displayed on the menu screen under **Settings → Debug →
-WiFi IP** and printed to serial at boot.
+Network → WiFi IP** and printed to serial at boot.
 
 No additional libraries are required — the web server uses the built-in
 ESP32 `WebServer` library.
@@ -358,13 +358,18 @@ cd Generic-3D-Printer-Fan-Controller
 
 ### 2. Configure WiFi (on device)
 
-WiFi credentials are entered on the device itself using the on-screen
-keyboard. Navigate to **Settings → Debug → Network** and edit the SSID
-and password. Credentials are saved to flash and persist across reboots.
+WiFi credentials are entered on the device itself using a full-screen
+T9-style on-screen keyboard. Navigate to **Settings → Debug → Network**
+and select **SSID 2.4G** or **Password**. The SSID item shows the
+currently configured network name; the password item shows "Is set" or
+"Not set" (the actual password is never displayed).
 
-> A `wifi_credentials.h` file is no longer required. If you previously
-> used one, the device will prompt for new credentials after this update
-> (EEPROM layout has changed).
+Credentials are saved to flash and persist across reboots.
+
+> **Important:** The ESP32 only supports **2.4 GHz WiFi**. It cannot
+> connect to 5 GHz networks. If your router uses a single SSID for both
+> bands, either configure a separate 2.4 GHz SSID or ensure the ESP32
+> can see the 2.4 GHz band.
 
 ### 3. Select your display driver
 
@@ -441,6 +446,35 @@ All settings are persisted to flash immediately when changed.
 | Exhaust Fan Present | Mark exhaust fan as installed or not |
 | Recirc Fan Present | Mark recirculation fan as installed or not |
 | Logging Interval | 1–60 min interval for log rows (default 5 min) |
+| Network → SSID 2.4G | Current WiFi SSID (click to edit via T9 keyboard) |
+| Network → Password | Shows "Is set" / "Not set" (click to edit via T9 keyboard) |
+| Network → WiFi IP | Current IP address (read-only) |
+
+---
+
+## On-Screen Keyboard
+
+WiFi credentials are entered using a full-screen T9-style keyboard that
+takes over the display. The keyboard has three layouts (lowercase,
+uppercase, numbers/symbols) arranged as a 6×3 grid of buttons.
+
+- **Rotary encoder** navigates between buttons
+- **Encoder press** selects a character; repeated presses within the
+  700 ms timeout cycle through the characters on that button
+  (e.g. a → b → c → a → …)
+- **Pending character** is shown in bright yellow; committed characters
+  are shown in orange
+- **Timeout expiry** commits the pending character automatically
+- **Back button (K0)** cancels and exits without saving
+- **Long encoder press** (≥600 ms) also cancels
+- **On-screen OK** saves and triggers WiFi reconnection (shows
+  "Setting up WiFi…" message)
+- **On-screen ESC** cancels without saving
+
+> The keyboard reads the encoder button directly via GPIO because
+> TcMenu's `takeOverDisplay` callback does not provide individual
+> press edges. TcMenu's built-in text editor is suppressed for
+> network menu items via `MenuManagerObserver::menuEditStarting()`.
 
 ---
 
