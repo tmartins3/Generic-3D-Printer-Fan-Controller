@@ -107,6 +107,9 @@ void SerialInterface::_cmdHelp() {
     Serial.println(" set hfp       on|off         heating fan present");
     Serial.println(" set efp       on|off         exhaust fan present");
     Serial.println(" set rfp       on|off         recirc fan present");
+    Serial.println(" set hip       on|off         heating fan invert PWM");
+    Serial.println(" set eip       on|off         exhaust fan invert PWM");
+    Serial.println(" set rip       on|off         recirc fan invert PWM");
     Serial.println(" set light     on|off         chamber light");
     Serial.println(" log list                     list log files");
     Serial.println(" log fetch hot|cold|active    stream log file to serial");
@@ -300,6 +303,36 @@ void SerialInterface::_cmdSet(const char* key, const char* value) {
         menuSyncSettings();
         gSettings.save();
         _ok(gSettings.debug.recircFanPresent ? "recirc fan present" : "recirc fan absent");
+
+    // --- invert PWM: heating ---
+    } else if (strcasecmp(key, "hip") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.heatingFanInvertPwm = isOn(value);
+        applyFanPresence();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.heatingFanInvertPwm ? "heating fan invert PWM ON"
+                                                 : "heating fan invert PWM OFF");
+
+    // --- invert PWM: exhaust ---
+    } else if (strcasecmp(key, "eip") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.exhaustFanInvertPwm = isOn(value);
+        applyFanPresence();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.exhaustFanInvertPwm ? "exhaust fan invert PWM ON"
+                                                 : "exhaust fan invert PWM OFF");
+
+    // --- invert PWM: recirc ---
+    } else if (strcasecmp(key, "rip") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.recircFanInvertPwm = isOn(value);
+        applyFanPresence();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.recircFanInvertPwm ? "recirc fan invert PWM ON"
+                                                : "recirc fan invert PWM OFF");
 
     // --- chamber light ---
     } else if (strcasecmp(key, "light") == 0) {

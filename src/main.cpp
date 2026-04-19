@@ -145,12 +145,15 @@ void wifiReconnect() {
 }
 
 // ============================================================
-// applyFanPresence — sync fan present flags from settings
+// applyFanPresence — sync fan present and invert flags from settings
 // ============================================================
 void applyFanPresence() {
     exhaustFan.setPresent(gSettings.debug.exhaustFanPresent);
     recircFan.setPresent(gSettings.debug.recircFanPresent);
     heatingFan.setPresent(gSettings.debug.heatingFanPresent);
+    exhaustFan.setInvertPwm(gSettings.debug.exhaustFanInvertPwm);
+    recircFan.setInvertPwm(gSettings.debug.recircFanInvertPwm);
+    heatingFan.setInvertPwm(gSettings.debug.heatingFanInvertPwm);
 }
 
 // ============================================================

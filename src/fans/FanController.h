@@ -30,6 +30,11 @@ public:
     void setPresent(bool present) { _present = present; }
     bool isPresent() const { return _present; }
 
+    // Invert PWM signal: 100% duty becomes 0% and vice versa.
+    // Useful for NPN+MOSFET driver circuits without logic-level MOSFETs.
+    void setInvertPwm(bool invert) { _invertPwm = invert; }
+    bool isInvertPwm() const { return _invertPwm; }
+
     // Set fan speed. percent is clamped to [0, 100].
     // 0 % stops the fan (duty = 0). No-op if fan is not present.
     void setSpeed(uint8_t percent);
@@ -59,4 +64,5 @@ private:
     uint8_t  _speedPercent;
     uint16_t _rpm;
     bool     _present;
+    bool     _invertPwm;
 };

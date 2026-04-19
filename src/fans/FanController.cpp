@@ -29,7 +29,8 @@ FanController::FanController(uint8_t pwmPin, uint8_t tachPin, uint8_t ledcChanne
       _speedPercent(0),
       _rpm(0),
       _pulseCount(0),
-      _present(true)
+      _present(true),
+      _invertPwm(false)
 {}
 
 void FanController::begin() {
@@ -63,6 +64,7 @@ void FanController::setFrequency(uint32_t freqHz) {
     ledcSetup(_ledcChannel, freqHz, FAN_PWM_RESOLUTION);
     // Re-apply current speed at new frequency
     uint32_t duty = map(_speedPercent, 0, 100, 0, FAN_PWM_MAX_DUTY);
+    if (_invertPwm) duty = FAN_PWM_MAX_DUTY - duty;
     ledcWrite(_ledcChannel, duty);
     Serial.printf("[Fan] Pin %d freq set to %lu Hz\n", _pwmPin, freqHz);
 }
@@ -71,6 +73,7 @@ void FanController::setSpeed(uint8_t percent) {
     if (!_present) { _speedPercent = 0; return; }
     _speedPercent = constrain(percent, 0, 100);
     uint32_t duty = map(_speedPercent, 0, 100, 0, FAN_PWM_MAX_DUTY);
+    if (_invertPwm) duty = FAN_PWM_MAX_DUTY - duty;
     ledcWrite(_ledcChannel, duty);
 }
 

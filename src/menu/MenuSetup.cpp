@@ -130,10 +130,15 @@ const AnalogMenuInfo minfoDebugManualHeating = {
 };
 AnalogMenuItem menuDebugManualHeating(&minfoDebugManualHeating, 0, nullptr, INFO_LOCATION_RAM);
 
+const BooleanMenuInfo minfoInvertPwmHeating = {
+    "Invert PWM", ID_INVERT_PWM_HEATING, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuInvertPwmHeating(&minfoInvertPwmHeating, false, &menuDebugManualHeating, INFO_LOCATION_RAM);
+
 const EnumMenuInfo minfoFanTypeHeating = {
     "Fan Type", ID_FAN_TYPE_HEATING, 0xffff, 2, onSettingChanged, fanTypeStrings
 };
-EnumMenuItem menuFanTypeHeating(&minfoFanTypeHeating, 2, &menuDebugManualHeating, INFO_LOCATION_RAM);
+EnumMenuItem menuFanTypeHeating(&minfoFanTypeHeating, 2, &menuInvertPwmHeating, INFO_LOCATION_RAM);
 
 const BooleanMenuInfo minfoDebugHeatingFan = {
     "Fan Present", ID_DEBUG_HEATING_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
@@ -151,10 +156,15 @@ const AnalogMenuInfo minfoDebugManualExhaust = {
 };
 AnalogMenuItem menuDebugManualExhaust(&minfoDebugManualExhaust, 0, &menuDebugKd, INFO_LOCATION_RAM);
 
+const BooleanMenuInfo minfoInvertPwmExhaust = {
+    "Invert PWM", ID_INVERT_PWM_EXHAUST, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuInvertPwmExhaust(&minfoInvertPwmExhaust, false, &menuDebugManualExhaust, INFO_LOCATION_RAM);
+
 const EnumMenuInfo minfoFanTypeExhaust = {
     "Fan Type", ID_FAN_TYPE_EXHAUST, 0xffff, 2, onSettingChanged, fanTypeStrings
 };
-EnumMenuItem menuFanTypeExhaust(&minfoFanTypeExhaust, 2, &menuDebugManualExhaust, INFO_LOCATION_RAM);
+EnumMenuItem menuFanTypeExhaust(&minfoFanTypeExhaust, 2, &menuInvertPwmExhaust, INFO_LOCATION_RAM);
 
 const BooleanMenuInfo minfoDebugExhaustFan = {
     "Fan Present", ID_DEBUG_EXHAUST_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
@@ -172,10 +182,15 @@ const AnalogMenuInfo minfoDebugManualRecirc = {
 };
 AnalogMenuItem menuDebugManualRecirc(&minfoDebugManualRecirc, 0, nullptr, INFO_LOCATION_RAM);
 
+const BooleanMenuInfo minfoInvertPwmRecirc = {
+    "Invert PWM", ID_INVERT_PWM_RECIRC, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuInvertPwmRecirc(&minfoInvertPwmRecirc, false, &menuDebugManualRecirc, INFO_LOCATION_RAM);
+
 const EnumMenuInfo minfoFanTypeRecirc = {
     "Fan Type", ID_FAN_TYPE_RECIRC, 0xffff, 2, onSettingChanged, fanTypeStrings
 };
-EnumMenuItem menuFanTypeRecirc(&minfoFanTypeRecirc, 2, &menuDebugManualRecirc, INFO_LOCATION_RAM);
+EnumMenuItem menuFanTypeRecirc(&minfoFanTypeRecirc, 2, &menuInvertPwmRecirc, INFO_LOCATION_RAM);
 
 const BooleanMenuInfo minfoDebugRecircFan = {
     "Fan Present", ID_DEBUG_RECIRC_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
@@ -597,6 +612,9 @@ void _loadSettingsToMenu() {
     menuFanTypeHeating.setCurrentValue(static_cast<uint8_t>(gSettings.debug.heatingFanType), true);
     menuFanTypeExhaust.setCurrentValue(static_cast<uint8_t>(gSettings.debug.exhaustFanType), true);
     menuFanTypeRecirc.setCurrentValue(static_cast<uint8_t>(gSettings.debug.recircFanType), true);
+    menuInvertPwmHeating.setBoolean(gSettings.debug.heatingFanInvertPwm, true);
+    menuInvertPwmExhaust.setBoolean(gSettings.debug.exhaustFanInvertPwm, true);
+    menuInvertPwmRecirc.setBoolean(gSettings.debug.recircFanInvertPwm, true);
     menuLowPinPwmFreq.setCurrentValue(gSettings.lowPinPwmFreqHz, true);
     menuChamberLight.setBoolean(gSettings.chamberLightOn, true);
 
@@ -912,6 +930,18 @@ void onSettingChanged(int id) {
             gSettings.debug.recircFanType =
                 static_cast<FanType>(menuFanTypeRecirc.getCurrentValue());
             applyFanFrequencies();
+            break;
+        case ID_INVERT_PWM_HEATING:
+            gSettings.debug.heatingFanInvertPwm = menuInvertPwmHeating.getBoolean();
+            applyFanPresence();  // re-applies invert flag to FanController
+            break;
+        case ID_INVERT_PWM_EXHAUST:
+            gSettings.debug.exhaustFanInvertPwm = menuInvertPwmExhaust.getBoolean();
+            applyFanPresence();
+            break;
+        case ID_INVERT_PWM_RECIRC:
+            gSettings.debug.recircFanInvertPwm = menuInvertPwmRecirc.getBoolean();
+            applyFanPresence();
             break;
         case ID_LOW_PIN_PWM_FREQ:
             gSettings.lowPinPwmFreqHz =

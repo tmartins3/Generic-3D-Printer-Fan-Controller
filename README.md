@@ -59,6 +59,11 @@ Fan Type. 2-pin and 3-pin fans use a configurable lower PWM frequency
 (default 100 Hz, set under Settings → 2P/3P PWM Frequency). 2-pin fans
 cannot report RPM and show "2PIN/NA" in the RPM submenu.
 
+Each fan also has an **Invert PWM** option (default: NO). When enabled,
+the PWM duty cycle is inverted (0% duty = full speed, 100% duty = off).
+This allows driving fans through a simple NPN transistor + P-channel
+MOSFET circuit when logic-level N-channel MOSFETs are not available.
+
 ---
 
 ### Control Modes
@@ -222,6 +227,9 @@ Connect with any serial terminal or `pio device monitor`.
 | `set hfp on\|off` | Set heating fan present |
 | `set efp on\|off` | Set exhaust fan present |
 | `set rfp on\|off` | Set recirc fan present |
+| `set hip on\|off` | Invert heating fan PWM signal |
+| `set eip on\|off` | Invert exhaust fan PWM signal |
+| `set rip on\|off` | Invert recirc fan PWM signal |
 | `set light on\|off` | Toggle chamber light |
 | `log list` | List log files with sizes |
 | `log fetch hot\|cold\|active` | Stream a log file to serial |
@@ -501,6 +509,7 @@ Each fan has its own settings submenu under Settings.
 |---------|-------------|
 | Heating Fan Present | Mark as installed or not |
 | Fan Type | 2PIN / 3PIN / 4PIN |
+| Invert PWM | Invert duty cycle for NPN+MOSFET circuits |
 | Manual Speed | Fan speed % in MANUAL mode |
 
 **Exhaust Fan Settings:**
@@ -509,6 +518,7 @@ Each fan has its own settings submenu under Settings.
 |---------|-------------|
 | Exhaust Fan Present | Mark as installed or not |
 | Fan Type | 2PIN / 3PIN / 4PIN |
+| Invert PWM | Invert duty cycle for NPN+MOSFET circuits |
 | Manual Speed | Fan speed % in MANUAL mode |
 | PID Kd / Ki / Kp | PID gains for COOLING mode |
 
@@ -518,6 +528,7 @@ Each fan has its own settings submenu under Settings.
 |---------|-------------|
 | Recirc Fan Present | Mark as installed or not |
 | Fan Type | 2PIN / 3PIN / 4PIN |
+| Invert PWM | Invert duty cycle for NPN+MOSFET circuits |
 | Manual Speed | Fan speed % in MANUAL mode |
 
 ### Other Settings

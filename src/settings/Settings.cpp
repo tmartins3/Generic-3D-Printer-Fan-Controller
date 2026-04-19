@@ -88,6 +88,9 @@ void Settings::applyDefaults() {
     debug.heatingFanType       = FanType::Pin4;
     debug.exhaustFanType       = FanType::Pin4;
     debug.recircFanType        = FanType::Pin4;
+    debug.heatingFanInvertPwm  = false;
+    debug.exhaustFanInvertPwm  = false;
+    debug.recircFanInvertPwm   = false;
 
     chamberLightOn = false;
     lowPinPwmFreqHz = 100;
@@ -177,15 +180,18 @@ void Settings::dump(Print& out) const {
     out.printf(" manual exh    : %d %%\n",  debug.manualExhaustFanSpeed);
     out.printf(" manual rec    : %d %%\n",  debug.manualRecircFanSpeed);
     out.println(" -- Hardware --");
-    out.printf(" heating fan   : %s  type: %s\n",
+    out.printf(" heating fan   : %s  type: %s  invert: %s\n",
               debug.heatingFanPresent ? "yes" : "no",
-              fanTypeToString(debug.heatingFanType));
-    out.printf(" exhaust fan   : %s  type: %s\n",
+              fanTypeToString(debug.heatingFanType),
+              debug.heatingFanInvertPwm ? "yes" : "no");
+    out.printf(" exhaust fan   : %s  type: %s  invert: %s\n",
               debug.exhaustFanPresent ? "yes" : "no",
-              fanTypeToString(debug.exhaustFanType));
-    out.printf(" recirc fan    : %s  type: %s\n",
+              fanTypeToString(debug.exhaustFanType),
+              debug.exhaustFanInvertPwm ? "yes" : "no");
+    out.printf(" recirc fan    : %s  type: %s  invert: %s\n",
               debug.recircFanPresent ? "yes" : "no",
-              fanTypeToString(debug.recircFanType));
+              fanTypeToString(debug.recircFanType),
+              debug.recircFanInvertPwm ? "yes" : "no");
     out.printf(" chamber light : %s\n", debug.chamberLightPresent ? "yes" : "no");
     out.printf(" 2P/3P PWM Hz  : %d\n", lowPinPwmFreqHz);
     out.printf(" log interval  : %d min\n", debug.logIntervalMin);

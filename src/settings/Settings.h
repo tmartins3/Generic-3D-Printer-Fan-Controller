@@ -12,7 +12,7 @@
 
 // Magic key written at the start of EEPROM to detect valid data.
 // Change this value if you restructure the EEPROM layout to force a reset.
-#define SETTINGS_MAGIC  0xFC07   // bump when Settings layout changes
+#define SETTINGS_MAGIC  0xFC08   // bump when Settings layout changes
 
 // EEPROM base address used by settings (TcMenu occupies from this address)
 #define SETTINGS_EEPROM_BASE  2   // bytes 0-1 reserved for magic key
@@ -61,6 +61,9 @@ struct DebugSettings {
     FanType  heatingFanType;         // default: Pin4
     FanType  exhaustFanType;         // default: Pin4
     FanType  recircFanType;          // default: Pin4
+    bool     heatingFanInvertPwm;   // true = invert PWM signal (for NPN+MOSFET)
+    bool     exhaustFanInvertPwm;   // true = invert PWM signal (for NPN+MOSFET)
+    bool     recircFanInvertPwm;    // true = invert PWM signal (for NPN+MOSFET)
 };
 
 struct NetworkSettings {

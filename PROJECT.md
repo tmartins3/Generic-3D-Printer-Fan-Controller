@@ -17,7 +17,10 @@ MOSFET), or **2-pin** (no tach, speed via MOSFET). The fan type for each
 fan is configurable in the per-fan settings submenu. 2-pin and 3-pin fans
 require an external N-channel MOSFET on the power line for speed control
 and use a lower configurable PWM frequency (default 100 Hz). 4-pin fans
-use the standard 25 kHz PWM signal.
+use the standard 25 kHz PWM signal. Each fan has an **Invert PWM** option
+that reverses the duty cycle (0% = full speed, 100% = off), enabling use
+of NPN transistor + P-channel MOSFET driver circuits when logic-level
+N-channel MOSFETs are not available.
 
 ## Temperature Sensors
 
@@ -143,10 +146,12 @@ Describe how the firmware should behave.
   - Heating Fan Settings
     - Heating Fan Present ON/OFF
     - Fan Type: 2PIN / 3PIN / 4PIN
+    - Invert PWM: YES / NO (default: NO)
     - Manual Speed %
   - Exhaust Fan Settings
     - Exhaust Fan Present ON/OFF
     - Fan Type: 2PIN / 3PIN / 4PIN
+    - Invert PWM: YES / NO (default: NO)
     - Manual Speed %
     - PID `Kd` (default: 1.0)
     - PID `Ki` (default: 0.5)
@@ -154,6 +159,7 @@ Describe how the firmware should behave.
   - Recirc Fan Settings
     - Recirc Fan Present ON/OFF
     - Fan Type: 2PIN / 3PIN / 4PIN
+    - Invert PWM: YES / NO (default: NO)
     - Manual Speed %
   - Manual Debug Sens Ctrl
     - Manual Sensor Control ON/OFF
@@ -302,7 +308,7 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
     configurable 2P/3P PWM frequency (default 100 Hz)
   - Fan RPM submenu at root level; 2-pin fans display "2PIN/NA"
   - Per-fan settings submenus (Heating/Exhaust/Recirc Fan Settings)
-    with fan presence, fan type, and manual speed
+    with fan presence, fan type, invert PWM, and manual speed
   - MANUAL operating mode for direct fan speed control
   - Debug sensor simulation (Settings → Manual Debug Sens Ctrl)
   - Wi-Fi credentials configured via full-screen T9 on-screen

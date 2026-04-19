@@ -37,10 +37,12 @@
 //       ├── Heating Fan Settings [submenu]
 //       │   ├── Fan Present   [boolean]
 //       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   ├── Invert PWM    [boolean] YES / NO
 //       │   └── Manual Speed  [analog]  %
 //       ├── Exhaust Fan Settings [submenu]
 //       │   ├── Fan Present   [boolean]
 //       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   ├── Invert PWM    [boolean] YES / NO
 //       │   ├── Manual Speed  [analog]  %
 //       │   ├── PID Kp        [analog]  x.xx
 //       │   ├── PID Ki        [analog]  x.xx
@@ -48,6 +50,7 @@
 //       ├── Recirc Fan Settings  [submenu]
 //       │   ├── Fan Present   [boolean]
 //       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   ├── Invert PWM    [boolean] YES / NO
 //       │   └── Manual Speed  [analog]  %
 //       ├── Manual Debug Sens Ctrl [submenu]
 //       │   ├── Debug Mode    [boolean]
@@ -142,6 +145,9 @@ enum MenuItemId : menuid_t {
     ID_FAN_TYPE_EXHAUST    = 70,
     ID_FAN_TYPE_RECIRC     = 71,
     ID_LOW_PIN_PWM_FREQ    = 72,
+    ID_INVERT_PWM_HEATING  = 73,
+    ID_INVERT_PWM_EXHAUST  = 74,
+    ID_INVERT_PWM_RECIRC   = 75,
 };
 
 // ---------------------------------------------------------------------------
