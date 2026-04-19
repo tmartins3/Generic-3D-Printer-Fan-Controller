@@ -11,6 +11,7 @@ const char* controllerStateToString(ControllerState state) {
         case ControllerState::Recirculating: return "RECIRCULATING";
         case ControllerState::Heating:       return "HEATING";
         case ControllerState::Cooling:       return "COOLING";
+        case ControllerState::Manual:        return "MANUAL";
         default:                             return "UNKNOWN";
     }
 }
@@ -41,11 +42,27 @@ void StateMachine::begin() {
 // ---------------------------------------------------------------------------
 
 void StateMachine::update() {
-    if (gSettings.debug.manualFanControl) {
+    OperatingMode mode = gSettings.operatingMode;
+
+    // MANUAL mode — fan speeds set directly from per-fan settings
+    if (mode == OperatingMode::Manual) {
+        if (_state != ControllerState::Manual) {
+            _state = ControllerState::Manual;
+            _mdtRunning = false;
+            _pid.reset();
+            gSettings.debug.manualFanControl = true;
+            Serial.println("[SM] -> MANUAL");
+        }
         _heatingFan.setSpeed(gSettings.debug.manualHeatingFanSpeed);
         _exhaustFan.setSpeed(gSettings.debug.manualExhaustFanSpeed);
         _recircFan.setSpeed(gSettings.debug.manualRecircFanSpeed);
         return;
+    }
+
+    // Leaving MANUAL mode — clear manual flag
+    if (_state == ControllerState::Manual) {
+        gSettings.debug.manualFanControl = false;
+        _enterIdle();
     }
 
     float bedTemp     = _getBedTemp();
@@ -61,8 +78,6 @@ void StateMachine::update() {
         _exhaustFan.setSpeed(gSettings.cold.exhaustFanMax);
         Serial.println("[SM] Chamber sensor error — exhaust at max");
     }
-
-    OperatingMode mode = gSettings.operatingMode;
 
     // -----------------------------------------------------------------------
     // Forced modes (HEAT / COOL): entered immediately, no RFSBT/MDT check on

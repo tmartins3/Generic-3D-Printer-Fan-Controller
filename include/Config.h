@@ -11,7 +11,7 @@
 #define DISPLAY_DRIVER_ST7789 2
 
 // Select the active TFT controller here.
-#define TFT_DRIVER_TYPE DISPLAY_DRIVER_ST7789
+#define TFT_DRIVER_TYPE DISPLAY_DRIVER_ST7735
 
 #define PIN_TFT_SCL   18   // SPI clock (hardware SPI SCLK)
 #define PIN_TFT_SDA   23   // SPI MOSI  (hardware SPI MOSI)
@@ -21,8 +21,8 @@
 #define PIN_TFT_BLK   21   // Backlight (GPIO HIGH = on)
 
 #if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7735
-#define TFT_WIDTH     128
-#define TFT_HEIGHT    160
+#define TFT_WIDTH     160   // post-rotation (rotation 1: 128×160 → 160 wide × 128 tall)
+#define TFT_HEIGHT    128
 #define TFT_INIT_WIDTH  128
 #define TFT_INIT_HEIGHT 160
 #define TFT_ROTATION     1
@@ -37,7 +37,11 @@
 #endif
 
 // Reserve space at the bottom of the screen that TcMenu should not render into.
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
 #define TFT_RESERVED_BOTTOM_PX 80
+#elif TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7735
+#define TFT_RESERVED_BOTTOM_PX 30
+#endif
 #define TFT_MENU_HEIGHT (TFT_HEIGHT - TFT_RESERVED_BOTTOM_PX)
 
 // --- Rotary Encoder + Buttons ------------------------------------------------

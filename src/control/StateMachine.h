@@ -23,7 +23,8 @@ enum class ControllerState : uint8_t {
     Idle          = 0,
     Recirculating = 1,
     Heating       = 2,
-    Cooling       = 3
+    Cooling       = 3,
+    Manual        = 4
 };
 
 // Human-readable names for serial debug output.

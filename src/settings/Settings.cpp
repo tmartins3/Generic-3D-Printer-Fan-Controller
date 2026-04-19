@@ -18,6 +18,7 @@ struct SettingsData {
     uint8_t       recircStartBedTemp;
     uint8_t       recircStartSpeed;
     bool          chamberLightOn;
+    uint16_t      lowPinPwmFreqHz;
     HotChamberSettings  hot;
     ColdChamberSettings cold;
     DebugSettings       debug;
@@ -65,8 +66,12 @@ void Settings::applyDefaults() {
     debug.recircFanPresent     = true;
     debug.chamberLightPresent  = true;
     debug.logIntervalMin       = 5;
+    debug.heatingFanType       = FanType::Pin4;
+    debug.exhaustFanType       = FanType::Pin4;
+    debug.recircFanType        = FanType::Pin4;
 
     chamberLightOn = false;
+    lowPinPwmFreqHz = 100;
 
     network.ssid[0]     = '\0';
     network.password[0] = '\0';
@@ -91,6 +96,7 @@ bool Settings::load() {
     recircStartBedTemp    = data.recircStartBedTemp;
     recircStartSpeed      = data.recircStartSpeed;
     chamberLightOn        = data.chamberLightOn;
+    lowPinPwmFreqHz       = data.lowPinPwmFreqHz;
     hot                   = data.hot;
     cold                  = data.cold;
     debug                 = data.debug;
@@ -110,6 +116,7 @@ void Settings::save() {
     data.recircStartBedTemp   = recircStartBedTemp;
     data.recircStartSpeed     = recircStartSpeed;
     data.chamberLightOn       = chamberLightOn;
+    data.lowPinPwmFreqHz      = lowPinPwmFreqHz;
     data.hot                  = hot;
     data.cold                 = cold;
     data.debug                = debug;

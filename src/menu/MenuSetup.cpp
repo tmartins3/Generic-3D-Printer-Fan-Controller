@@ -111,35 +111,80 @@ GraphicsDeviceRenderer renderer(30, applicationInfo.name, &gfxDrawable);
 // DEBUG submenu  (build bottom-up: last item first, back item last)
 // ===========================================================================
 
-// Debug PID Kd  [0.00–10.00, stored as 0–1000]
+// PID Kd  [0.00–10.00, stored as 0–1000] — lives inside Exhaust Fan submenu
 const AnalogMenuInfo minfoDebugKd = {
     "PID Kd", ID_DEBUG_KD, 0xffff, PID_MAX, onSettingChanged, 0, PID_DIV, ""
 };
 AnalogMenuItem menuDebugKd(&minfoDebugKd, 100, nullptr, INFO_LOCATION_RAM);
 
-const SubMenuInfo minfoDebugPid = { "Cooling PID", ID_DEBUG_PID_MENU, 0xffff, 0, NO_CALLBACK };
-BackMenuItem menuBackDebugPid(&minfoDebugPid, &menuDebugKd, INFO_LOCATION_RAM);
-SubMenuItem menuDebugPid(&minfoDebugPid, &menuBackDebugPid, nullptr, INFO_LOCATION_RAM);
+// ---- Shared fan type enum strings (0=2PIN, 1=3PIN, 2=4PIN) ----
+const char fanTypeStr0[] = "2PIN";
+const char fanTypeStr1[] = "3PIN";
+const char fanTypeStr2[] = "4PIN";
+const char* const fanTypeStrings[] = { fanTypeStr0, fanTypeStr1, fanTypeStr2 };
+
+// ---- Heating Fan submenu ----
+
+const AnalogMenuInfo minfoDebugManualHeating = {
+    "Manual Speed", ID_DEBUG_MANUAL_HEATING, 0xffff, 100, onSettingChanged, 0, 1, "%"
+};
+AnalogMenuItem menuDebugManualHeating(&minfoDebugManualHeating, 0, nullptr, INFO_LOCATION_RAM);
+
+const EnumMenuInfo minfoFanTypeHeating = {
+    "Fan Type", ID_FAN_TYPE_HEATING, 0xffff, 2, onSettingChanged, fanTypeStrings
+};
+EnumMenuItem menuFanTypeHeating(&minfoFanTypeHeating, 2, &menuDebugManualHeating, INFO_LOCATION_RAM);
+
+const BooleanMenuInfo minfoDebugHeatingFan = {
+    "Fan Present", ID_DEBUG_HEATING_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuDebugHeatingFan(&minfoDebugHeatingFan, true, &menuFanTypeHeating, INFO_LOCATION_RAM);
+
+const SubMenuInfo minfoFanHeating = { "Heating Fan Settings", ID_FAN_HEATING_MENU, 0xffff, 0, NO_CALLBACK };
+BackMenuItem menuBackFanHeating(&minfoFanHeating, &menuDebugHeatingFan, INFO_LOCATION_RAM);
+SubMenuItem menuFanHeating(&minfoFanHeating, &menuBackFanHeating, nullptr, INFO_LOCATION_RAM);
+
+// ---- Exhaust Fan submenu ----
+
+const AnalogMenuInfo minfoDebugManualExhaust = {
+    "Manual Speed", ID_DEBUG_MANUAL_EXHAUST, 0xffff, 100, onSettingChanged, 0, 1, "%"
+};
+AnalogMenuItem menuDebugManualExhaust(&minfoDebugManualExhaust, 0, &menuDebugKd, INFO_LOCATION_RAM);
+
+const EnumMenuInfo minfoFanTypeExhaust = {
+    "Fan Type", ID_FAN_TYPE_EXHAUST, 0xffff, 2, onSettingChanged, fanTypeStrings
+};
+EnumMenuItem menuFanTypeExhaust(&minfoFanTypeExhaust, 2, &menuDebugManualExhaust, INFO_LOCATION_RAM);
+
+const BooleanMenuInfo minfoDebugExhaustFan = {
+    "Fan Present", ID_DEBUG_EXHAUST_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
+};
+BooleanMenuItem menuDebugExhaustFan(&minfoDebugExhaustFan, true, &menuFanTypeExhaust, INFO_LOCATION_RAM);
+
+const SubMenuInfo minfoFanExhaust = { "Exhaust Fan Settings", ID_FAN_EXHAUST_MENU, 0xffff, 0, NO_CALLBACK };
+BackMenuItem menuBackFanExhaust(&minfoFanExhaust, &menuDebugExhaustFan, INFO_LOCATION_RAM);
+SubMenuItem menuFanExhaust(&minfoFanExhaust, &menuBackFanExhaust, nullptr, INFO_LOCATION_RAM);
+
+// ---- Recirculation Fan submenu ----
 
 const AnalogMenuInfo minfoDebugManualRecirc = {
-    "Recirculation Fan", ID_DEBUG_MANUAL_RECIRC, 0xffff, 100, onSettingChanged, 0, 1, "%"
+    "Manual Speed", ID_DEBUG_MANUAL_RECIRC, 0xffff, 100, onSettingChanged, 0, 1, "%"
 };
 AnalogMenuItem menuDebugManualRecirc(&minfoDebugManualRecirc, 0, nullptr, INFO_LOCATION_RAM);
 
-const AnalogMenuInfo minfoDebugManualExhaust = {
-    "Exhaust Fan Speed", ID_DEBUG_MANUAL_EXHAUST, 0xffff, 100, onSettingChanged, 0, 1, "%"
+const EnumMenuInfo minfoFanTypeRecirc = {
+    "Fan Type", ID_FAN_TYPE_RECIRC, 0xffff, 2, onSettingChanged, fanTypeStrings
 };
-AnalogMenuItem menuDebugManualExhaust(&minfoDebugManualExhaust, 0, &menuDebugManualRecirc, INFO_LOCATION_RAM);
+EnumMenuItem menuFanTypeRecirc(&minfoFanTypeRecirc, 2, &menuDebugManualRecirc, INFO_LOCATION_RAM);
 
-const AnalogMenuInfo minfoDebugManualHeating = {
-    "Heating Fan Speed", ID_DEBUG_MANUAL_HEATING, 0xffff, 100, onSettingChanged, 0, 1, "%"
+const BooleanMenuInfo minfoDebugRecircFan = {
+    "Fan Present", ID_DEBUG_RECIRC_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
 };
-AnalogMenuItem menuDebugManualHeating(&minfoDebugManualHeating, 0, &menuDebugManualExhaust, INFO_LOCATION_RAM);
+BooleanMenuItem menuDebugRecircFan(&minfoDebugRecircFan, true, &menuFanTypeRecirc, INFO_LOCATION_RAM);
 
-const BooleanMenuInfo minfoDebugManualEnable = {
-    "Manual Control", ID_DEBUG_MANUAL_ENABLE, 0xffff, 1, onSettingChanged, NAMING_ON_OFF
-};
-BooleanMenuItem menuDebugManualEnable(&minfoDebugManualEnable, false, &menuDebugManualHeating, INFO_LOCATION_RAM);
+const SubMenuInfo minfoFanRecirc = { "Recirc Fan Settings", ID_FAN_RECIRC_MENU, 0xffff, 0, NO_CALLBACK };
+BackMenuItem menuBackFanRecirc(&minfoFanRecirc, &menuDebugRecircFan, INFO_LOCATION_RAM);
+SubMenuItem menuFanRecirc(&minfoFanRecirc, &menuBackFanRecirc, nullptr, INFO_LOCATION_RAM);
 
 // ---- Network submenu items (bottom-up: last item first) ----
 
@@ -166,7 +211,7 @@ const SubMenuInfo minfoNetwork = { "Network", ID_NET_MENU, 0xffff, 0, NO_CALLBAC
 BackMenuItem menuBackNetwork(&minfoNetwork, &menuNetSsid, INFO_LOCATION_RAM);
 SubMenuItem menuNetwork(&minfoNetwork, &menuBackNetwork, nullptr, INFO_LOCATION_RAM);
 
-// ---- Fan presence flags ----
+// ---- Remaining debug-level items ----
 
 // Chamber Light Present YES/NO
 const BooleanMenuInfo minfoDebugChamberLight = {
@@ -181,66 +226,46 @@ const AnalogMenuInfo minfoDebugLogInterval = {
 AnalogMenuItem menuDebugLogInterval(&minfoDebugLogInterval, 5,
                                     &menuDebugChamberLight, INFO_LOCATION_RAM);
 
-const BooleanMenuInfo minfoDebugRecircFan = {
-    "Recirc Fan Present", ID_DEBUG_RECIRC_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
-};
-BooleanMenuItem menuDebugRecircFan(&minfoDebugRecircFan, true, &menuDebugLogInterval, INFO_LOCATION_RAM);
-
-const BooleanMenuInfo minfoDebugExhaustFan = {
-    "Exhaust Fan Present", ID_DEBUG_EXHAUST_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
-};
-BooleanMenuItem menuDebugExhaustFan(&minfoDebugExhaustFan, true, &menuDebugRecircFan, INFO_LOCATION_RAM);
-
-const BooleanMenuInfo minfoDebugHeatingFan = {
-    "Heating Fan Present", ID_DEBUG_HEATING_FAN, 0xffff, 1, onSettingChanged, NAMING_YES_NO
-};
-BooleanMenuItem menuDebugHeatingFan(&minfoDebugHeatingFan, true, &menuDebugExhaustFan, INFO_LOCATION_RAM);
-
-const SubMenuInfo minfoDebugManual = { "Manual Fan Control", ID_DEBUG_MANUAL_MENU, 0xffff, 0, NO_CALLBACK };
-BackMenuItem menuBackDebugManual(&minfoDebugManual, &menuDebugManualEnable, INFO_LOCATION_RAM);
-SubMenuItem menuDebugManual(&minfoDebugManual, &menuBackDebugManual, &menuDebugPid, INFO_LOCATION_RAM);
-
 // Debug PID Ki
 const AnalogMenuInfo minfoDebugKi = {
     "PID Ki", ID_DEBUG_KI, 0xffff, PID_MAX, onSettingChanged, 0, PID_DIV, ""
 };
-AnalogMenuItem menuDebugKi(&minfoDebugKi, 50, &menuDebugKd, INFO_LOCATION_RAM);
+AnalogMenuItem menuDebugKi(&minfoDebugKi, 50, nullptr, INFO_LOCATION_RAM);
 
 // Debug PID Kp
 const AnalogMenuInfo minfoDebugKp = {
     "PID Kp", ID_DEBUG_KP, 0xffff, PID_MAX, onSettingChanged, 0, PID_DIV, ""
 };
-AnalogMenuItem menuDebugKp(&minfoDebugKp, 200, &menuDebugKi, INFO_LOCATION_RAM);
+AnalogMenuItem menuDebugKp(&minfoDebugKp, 200, nullptr, INFO_LOCATION_RAM);
 
 // Debug Bed Temp  [0–100 °C]
 const AnalogMenuInfo minfoDebugBed = {
-    "Debug Bed Temp", ID_DEBUG_BED, 0xffff, 100, onSettingChanged, 0, 1, "C"
+    "Manual Bed Temp", ID_DEBUG_BED, 0xffff, 100, onSettingChanged, 0, 1, "C"
 };
 AnalogMenuItem menuDebugBed(&minfoDebugBed, 25, nullptr, INFO_LOCATION_RAM);
 
 // Debug Chamber Temp  [0–100 °C]
 const AnalogMenuInfo minfoDebugChamber = {
-    "Debug Chamber Temp", ID_DEBUG_CHAMBER, 0xffff, 100, onSettingChanged, 0, 1, "C"
+    "Manual Chamber Temp", ID_DEBUG_CHAMBER, 0xffff, 100, onSettingChanged, 0, 1, "C"
 };
 AnalogMenuItem menuDebugChamber(&minfoDebugChamber, 25, &menuDebugBed, INFO_LOCATION_RAM);
 
 // Debug Mode ON/OFF
 const BooleanMenuInfo minfoDebugMode = {
-    "Debug Mode", ID_DEBUG_MODE, 0xffff, 1, onSettingChanged, NAMING_ON_OFF
+    "Manual Sensor Control", ID_DEBUG_MODE, 0xffff, 1, onSettingChanged, NAMING_ON_OFF
 };
 BooleanMenuItem menuDebugMode(&minfoDebugMode, false, &menuDebugChamber, INFO_LOCATION_RAM);
 
-// Manual Sensor Control submenu  (contains Debug Mode, Chamber Temp, Bed Temp)
-const SubMenuInfo minfoDebugSensor = { "Manual Sensor Control", ID_DEBUG_SENSOR_MENU, 0xffff, 0, NO_CALLBACK };
+// Manual Debug Sensor Control submenu  (contains Debug Mode, Chamber Temp, Bed Temp)
+const SubMenuInfo minfoDebugSensor = { "Manual Debug Sens Ctrl", ID_DEBUG_SENSOR_MENU, 0xffff, 0, NO_CALLBACK };
 BackMenuItem menuBackDebugSensor(&minfoDebugSensor, &menuDebugMode, INFO_LOCATION_RAM);
-SubMenuItem menuDebugSensor(&minfoDebugSensor, &menuBackDebugSensor, &menuDebugManual, INFO_LOCATION_RAM);
+SubMenuItem menuDebugSensor(&minfoDebugSensor, &menuBackDebugSensor, nullptr, INFO_LOCATION_RAM);
 
-// Back item for Debug submenu
-const SubMenuInfo minfoDebug = { "Debug Settings", ID_DEBUG, 0xffff, 0, NO_CALLBACK };
-BackMenuItem menuBackDebug(&minfoDebug, &menuDebugSensor, INFO_LOCATION_RAM);
-
-// Debug submenu root  (next=nullptr because it is the last item in Settings)
-SubMenuItem menuDebug(&minfoDebug, &menuBackDebug, nullptr, INFO_LOCATION_RAM);
+// 2PIN/3PIN PWM Frequency [10–1000 Hz, default 100]
+const AnalogMenuInfo minfoLowPinPwmFreq = {
+    "2P/3P PWM Frequency", ID_LOW_PIN_PWM_FREQ, 0xffff, 1000, onSettingChanged, 0, 1, "Hz"
+};
+AnalogMenuItem menuLowPinPwmFreq(&minfoLowPinPwmFreq, 100, nullptr, INFO_LOCATION_RAM);
 
 // ===========================================================================
 // COLD CHAMBER submenu
@@ -273,8 +298,8 @@ AnalogMenuItem menuColdMax(&minfoColdMax, 100, &menuColdMin, INFO_LOCATION_RAM);
 const SubMenuInfo minfoCold = { "Cold Chamber Settings", ID_COLD, 0xffff, 0, NO_CALLBACK };
 BackMenuItem menuBackCold(&minfoCold, &menuColdMax, INFO_LOCATION_RAM);
 
-// Cold submenu root (next=&menuDebug, placing Debug after Cold in Settings list)
-SubMenuItem menuCold(&minfoCold, &menuBackCold, &menuDebug, INFO_LOCATION_RAM);
+// Cold submenu root (next=nullptr, wired via setNext in menuSetup)
+SubMenuItem menuCold(&minfoCold, &menuBackCold, nullptr, INFO_LOCATION_RAM);
 
 // ===========================================================================
 // HOT CHAMBER submenu
@@ -332,13 +357,14 @@ const AnalogMenuInfo minfoDecisionTime = {
 };
 AnalogMenuItem menuDecisionTime(&minfoDecisionTime, 10, &menuRecircTemp, INFO_LOCATION_RAM);
 
-// Operating Mode enum  0=AUTO  1=HEAT  2=COOL
+// Operating Mode enum  0=AUTO  1=HEAT  2=COOL  3=MANUAL
 const char opModeStr0[] = "AUTO";
 const char opModeStr1[] = "HEATING";
 const char opModeStr2[] = "COOLING";
-const char* const opModeStrings[] = { opModeStr0, opModeStr1, opModeStr2 };
+const char opModeStr3m[] = "MANUAL";
+const char* const opModeStrings[] = { opModeStr0, opModeStr1, opModeStr2, opModeStr3m };
 const EnumMenuInfo minfoOpMode = {
-    "Operating Mode", ID_OP_MODE, 0xffff, 2, onSettingChanged, opModeStrings
+    "Operating Mode", ID_OP_MODE, 0xffff, 3, onSettingChanged, opModeStrings
 };
 EnumMenuItem menuOpMode(&minfoOpMode, 0, &menuDecisionTime, INFO_LOCATION_RAM);
 
@@ -352,11 +378,28 @@ SubMenuItem menuSettings(&minfoSettings, &menuBackSettings, nullptr, INFO_LOCATI
 // ROOT — read-only status items
 // ===========================================================================
 
+// ===========================================================================
+// Fan RPM submenu (read-only tach readings, text items for 2PIN/NA support)
+// ===========================================================================
+
+const AnyMenuInfo minfoRpmExhaust = { "Exhaust Fan", ID_RPM_EXHAUST, 0xffff, 12, NO_CALLBACK };
+TextMenuItem menuRpmExhaust(&minfoRpmExhaust, "0 RPM", 12, nullptr, INFO_LOCATION_RAM);
+
+const AnyMenuInfo minfoRpmRecirc = { "Recirculation Fan", ID_RPM_RECIRC, 0xffff, 12, NO_CALLBACK };
+TextMenuItem menuRpmRecirc(&minfoRpmRecirc, "0 RPM", 12, &menuRpmExhaust, INFO_LOCATION_RAM);
+
+const AnyMenuInfo minfoRpmHeating = { "Heating Fan", ID_RPM_HEATING, 0xffff, 12, NO_CALLBACK };
+TextMenuItem menuRpmHeating(&minfoRpmHeating, "0 RPM", 12, &menuRpmRecirc, INFO_LOCATION_RAM);
+
+const SubMenuInfo minfoRpm = { "Fan RPM", ID_RPM_MENU, 0xffff, 0, NO_CALLBACK };
+BackMenuItem menuBackRpm(&minfoRpm, &menuRpmHeating, INFO_LOCATION_RAM);
+SubMenuItem menuRpm(&minfoRpm, &menuBackRpm, &menuSettings, INFO_LOCATION_RAM);
+
 // Chamber Light on/off — user-editable toggle at root level
 const BooleanMenuInfo minfoChamberLight = {
     "Chamber Light", ID_CHAMBER_LIGHT, 0xffff, 1, onSettingChanged, NAMING_ON_OFF
 };
-BooleanMenuItem menuChamberLight(&minfoChamberLight, false, &menuSettings, INFO_LOCATION_RAM);
+BooleanMenuItem menuChamberLight(&minfoChamberLight, false, &menuRpm, INFO_LOCATION_RAM);
 
 // Exhaust Fan %  [RO]
 const AnalogMenuInfo minfoExhaustFan = {
@@ -388,14 +431,15 @@ const AnalogMenuInfo minfoBedTemp = {
 };
 AnalogMenuItem menuBedTemp(&minfoBedTemp, 0, &menuChamberTemp, INFO_LOCATION_RAM);
 
-// Mode enum  [RO]  0=IDLE  1=RECIRC  2=HEAT  3=COOL
+// Mode enum  [RO]  0=IDLE  1=RECIRC  2=HEAT  3=COOL  4=MANUAL
 const char modeStr0[] = "IDLE";
 const char modeStr1[] = "RECIRC";
 const char modeStr2[] = "HEATING";
 const char modeStr3[] = "COOLING";
-const char* modeStrings[] = { modeStr0, modeStr1, modeStr2, modeStr3 };
+const char modeStr4[] = "MANUAL";
+const char* modeStrings[] = { modeStr0, modeStr1, modeStr2, modeStr3, modeStr4 };
 const EnumMenuInfo minfoMode = {
-    "Operating Mode", ID_MODE, 0xffff, 3, NO_CALLBACK, modeStrings
+    "Operating Mode", ID_MODE, 0xffff, 4, NO_CALLBACK, modeStrings
 };
 EnumMenuItem menuMode(&minfoMode, 0, &menuBedTemp, INFO_LOCATION_RAM);
 
@@ -419,8 +463,14 @@ static void installDarkTheme() {
         .withPalette(itemPalette)
         .withSpacing(1);
 
+    // Native bitmap font: size 2 for 320×240, size 1 for 128×160
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
+    constexpr int menuFontSize = 2;
+#else
+    constexpr int menuFontSize = 1;
+#endif
     themeBuilder.defaultItemProperties()
-        .withNativeFont(nullptr, 2)
+        .withNativeFont(nullptr, menuFontSize)
         .withPadding(MenuPadding(1))
         .withSpacing(0)
         .withJustification(GridPosition::JUSTIFY_TITLE_LEFT_VALUE_RIGHT)
@@ -465,6 +515,9 @@ void menuSetup() {
     menuRecircFan.setReadOnly(true);
     menuExhaustFan.setReadOnly(true);
     menuWifiIp.setReadOnly(true);
+    menuRpmHeating.setReadOnly(true);
+    menuRpmRecirc.setReadOnly(true);
+    menuRpmExhaust.setReadOnly(true);
 
     // Initialise switches (must be done before initForEncoder)
     switches.init(internalDigitalIo(), SWITCHES_NO_POLLING, true);
@@ -475,11 +528,18 @@ void menuSetup() {
                            PIN_ENC_B, PIN_ENC_A, PIN_ENC_BTN);
     menuMgr.setBackButton(PIN_BTN_K0);
 
-    // Finalize debug submenu ordering after all items are constructed.
-    menuBackDebugPid.setNext(&menuDebugKp);
-    // Insert Network submenu into debug chain: PID → Network → HeatingFan
-    menuDebugPid.setNext(&menuNetwork);
-    menuNetwork.setNext(&menuDebugHeatingFan);
+    // Finalize submenu ordering after all items are constructed.
+    // PID Kd → Ki → Kp chain inside Exhaust Fan submenu
+    menuDebugKd.setNext(&menuDebugKi);
+    menuDebugKi.setNext(&menuDebugKp);
+    // Wire Settings-level chain: Cold → Fan submenus → Sensor → Network → PWM → Log → Light
+    menuCold.setNext(&menuFanHeating);
+    menuFanHeating.setNext(&menuFanExhaust);
+    menuFanExhaust.setNext(&menuFanRecirc);
+    menuFanRecirc.setNext(&menuDebugSensor);
+    menuDebugSensor.setNext(&menuNetwork);
+    menuNetwork.setNext(&menuLowPinPwmFreq);
+    menuLowPinPwmFreq.setNext(&menuDebugLogInterval);
     menuMgr.addChangeNotification(&rootSelectionGuard);
 
     // Apply dark theme
@@ -520,7 +580,6 @@ void _loadSettingsToMenu() {
     menuDebugMode.setBoolean(gSettings.debug.debugMode, true);
     menuDebugChamber.setCurrentValue(static_cast<int>(gSettings.debug.debugChamberTemp), true);
     menuDebugBed.setCurrentValue(static_cast<int>(gSettings.debug.debugBedTemp), true);
-    menuDebugManualEnable.setBoolean(gSettings.debug.manualFanControl, true);
     menuDebugManualHeating.setCurrentValue(gSettings.debug.manualHeatingFanSpeed, true);
     menuDebugManualExhaust.setCurrentValue(gSettings.debug.manualExhaustFanSpeed, true);
     menuDebugManualRecirc.setCurrentValue(gSettings.debug.manualRecircFanSpeed, true);
@@ -532,6 +591,10 @@ void _loadSettingsToMenu() {
     menuDebugRecircFan.setBoolean(gSettings.debug.recircFanPresent, true);
     menuDebugChamberLight.setBoolean(gSettings.debug.chamberLightPresent, true);
     menuDebugLogInterval.setCurrentValue(gSettings.debug.logIntervalMin, true);
+    menuFanTypeHeating.setCurrentValue(static_cast<uint8_t>(gSettings.debug.heatingFanType), true);
+    menuFanTypeExhaust.setCurrentValue(static_cast<uint8_t>(gSettings.debug.exhaustFanType), true);
+    menuFanTypeRecirc.setCurrentValue(static_cast<uint8_t>(gSettings.debug.recircFanType), true);
+    menuLowPinPwmFreq.setCurrentValue(gSettings.lowPinPwmFreqHz, true);
     menuChamberLight.setBoolean(gSettings.chamberLightOn, true);
 
     // Show current SSID in the text item
@@ -592,6 +655,7 @@ static const char* _modeShortLabel(uint8_t stateModeIndex) {
         case 1: return "RECIRC";
         case 2: return gSettings.debug.heatingFanPresent ? "HEATING" : "HOT";
         case 3: return gSettings.debug.exhaustFanPresent ? "COOLING" : "COOL";
+        case 4: return "MANUAL";
         default: return "UNKN";
     }
 }
@@ -618,6 +682,11 @@ void applyFanPresenceToMenu() {
     menuHotRecirc.setVisible(rFan);
     menuColdRecirc.setVisible(rFan);
 
+    // RPM submenu items
+    menuRpmHeating.setVisible(hFan);
+    menuRpmRecirc.setVisible(rFan);
+    menuRpmExhaust.setVisible(cFan);
+
     // Sync root mode enum labels to fan presence
     modeStrings[2] = hFan ? "HEATING" : "HOT";
     modeStrings[3] = cFan ? "COOLING" : "COOL";
@@ -633,6 +702,7 @@ static uint16_t _modeFooterBackground(uint8_t stateModeIndex) {
         case 1: return RGB(0, 128, 128);   // RECI: teal
         case 2: return RGB(200, 0, 0);     // HEAT: strong red
         case 3: return RGB(0, 0, 255);     // COOL: blue
+        case 4: return RGB(180, 100, 0);   // MANUAL: orange
         default: return RGB(0, 0, 0);
     }
 }
@@ -641,8 +711,13 @@ static void _drawFooterStatus(uint8_t stateModeIndex, float chamberTempC) {
     constexpr uint16_t FOOTER_FG = RGB(255, 255, 255);
     const int16_t footerY = TFT_MENU_HEIGHT;
     const int16_t footerH = TFT_RESERVED_BOTTOM_PX;
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
     const int16_t textX = 12;
     const int16_t textBaselineY = footerY + 52;
+#else
+    const int16_t textX = 4;
+    const int16_t textBaselineY = footerY + 7;
+#endif
     const uint16_t footerBg = _modeFooterBackground(stateModeIndex);
     const int displayTempC =
         (chamberTempC <= TEMP_READ_ERROR) ? 0 : static_cast<int>(roundf(chamberTempC));
@@ -654,10 +729,15 @@ static void _drawFooterStatus(uint8_t stateModeIndex, float chamberTempC) {
 
     gfx.fillRect(0, footerY, TFT_WIDTH, footerH, footerBg);
 
-    gfx.setFont(&FreeSansBold9pt7b);
     gfx.setTextWrap(false);
     gfx.setTextColor(FOOTER_FG);
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
+    gfx.setFont(&FreeSansBold9pt7b);
     gfx.setTextSize(2);
+#else
+    gfx.setFont(nullptr);          // bitmap font, bold blocky look
+    gfx.setTextSize(2);            // 12×16 px per char — fills 30px footer well
+#endif
     gfx.setCursor(textX, textBaselineY);
     gfx.print(statusBuffer);
     gfx.setFont(nullptr);
@@ -699,6 +779,28 @@ void menuUpdateStatus(uint8_t  stateModeIndex,
     menuHeatingFan.setCurrentValue(heatingFanPct);
     menuRecircFan.setCurrentValue(recircFanPct);
     menuExhaustFan.setCurrentValue(exhaustFanPct);
+}
+
+void menuUpdateRpm(uint16_t heatingRpm, uint16_t recircRpm, uint16_t exhaustRpm) {
+    char buf[12];
+    if (gSettings.debug.heatingFanType == FanType::Pin2) {
+        menuRpmHeating.setTextValue("2PIN/NA", true);
+    } else {
+        snprintf(buf, sizeof(buf), "%u RPM", heatingRpm);
+        menuRpmHeating.setTextValue(buf, true);
+    }
+    if (gSettings.debug.recircFanType == FanType::Pin2) {
+        menuRpmRecirc.setTextValue("2PIN/NA", true);
+    } else {
+        snprintf(buf, sizeof(buf), "%u RPM", recircRpm);
+        menuRpmRecirc.setTextValue(buf, true);
+    }
+    if (gSettings.debug.exhaustFanType == FanType::Pin2) {
+        menuRpmExhaust.setTextValue("2PIN/NA", true);
+    } else {
+        snprintf(buf, sizeof(buf), "%u RPM", exhaustRpm);
+        menuRpmExhaust.setTextValue(buf, true);
+    }
 }
 
 void menuUpdateFooterStatus(uint8_t stateModeIndex, float chamberTempC) {
@@ -760,11 +862,6 @@ void onSettingChanged(int id) {
             gSettings.debug.debugBedTemp =
                 static_cast<float>(menuDebugBed.getCurrentValue());
             break;
-        case ID_DEBUG_MANUAL_ENABLE:
-            gSettings.debug.manualFanControl = menuDebugManualEnable.getBoolean();
-            Serial.printf("[Menu] Manual fan control: %s\n",
-                          gSettings.debug.manualFanControl ? "ON" : "OFF");
-            break;
         case ID_DEBUG_MANUAL_HEATING:
             gSettings.debug.manualHeatingFanSpeed = menuDebugManualHeating.getCurrentValue();
             break;
@@ -802,6 +899,26 @@ void onSettingChanged(int id) {
         case ID_DEBUG_LOG_INTERVAL:
             gSettings.debug.logIntervalMin =
                 static_cast<uint8_t>(menuDebugLogInterval.getCurrentValue());
+            break;
+        case ID_FAN_TYPE_HEATING:
+            gSettings.debug.heatingFanType =
+                static_cast<FanType>(menuFanTypeHeating.getCurrentValue());
+            applyFanFrequencies();
+            break;
+        case ID_FAN_TYPE_EXHAUST:
+            gSettings.debug.exhaustFanType =
+                static_cast<FanType>(menuFanTypeExhaust.getCurrentValue());
+            applyFanFrequencies();
+            break;
+        case ID_FAN_TYPE_RECIRC:
+            gSettings.debug.recircFanType =
+                static_cast<FanType>(menuFanTypeRecirc.getCurrentValue());
+            applyFanFrequencies();
+            break;
+        case ID_LOW_PIN_PWM_FREQ:
+            gSettings.lowPinPwmFreqHz =
+                static_cast<uint16_t>(menuLowPinPwmFreq.getCurrentValue());
+            applyFanFrequencies();
             break;
         case ID_CHAMBER_LIGHT:
             gSettings.chamberLightOn = menuChamberLight.getBoolean();

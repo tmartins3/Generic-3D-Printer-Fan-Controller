@@ -115,19 +115,24 @@ static const KeyDef _layouts[KB_LAYOUTS][KB_COUNT] = {
 };
 
 // ---------------------------------------------------------------------------
-// Screen geometry
-// 320 × 240 total display
-// Header: y = 0..KB_HDR_H-1
-// Keyboard: y = KB_HDR_H..239
+// Screen geometry — scaled per display resolution
 // ---------------------------------------------------------------------------
 
-#define KB_HDR_H    50                              // header height (px)
-#define KB_KB_H     (TFT_HEIGHT - KB_HDR_H)        // 190
-#define KB_CELL_W   (TFT_WIDTH  / KB_COLS)         // 53
-#define KB_CELL_H   (KB_KB_H   / KB_ROWS)          // 63
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
+// 320 × 240
+#define KB_HDR_H    50
 #define KB_PAD      3
-#define KB_BTN_W    (KB_CELL_W - 2 * KB_PAD)       // 47
-#define KB_BTN_H    (KB_CELL_H - 2 * KB_PAD)       // 57
+#else
+// 128 × 160
+#define KB_HDR_H    22
+#define KB_PAD      1
+#endif
+
+#define KB_KB_H     (TFT_HEIGHT - KB_HDR_H)
+#define KB_CELL_W   (TFT_WIDTH  / KB_COLS)
+#define KB_CELL_H   (KB_KB_H   / KB_ROWS)
+#define KB_BTN_W    (KB_CELL_W - 2 * KB_PAD)
+#define KB_BTN_H    (KB_CELL_H - 2 * KB_PAD)
 
 // Colors (RGB565)
 #define COL_BG       0x0000u   // black
@@ -222,11 +227,17 @@ void ScreenKeyboard::_renderCb(unsigned int encoderVal, RenderPressMode pressMod
             if (_finishAccepted) {
                 Adafruit_GFX& gfx = menuGetDisplay();
                 gfx.fillRect(0, 0, TFT_WIDTH, TFT_HEIGHT, COL_BG);
-                gfx.setFont(&FreeSansBold9pt7b);
-                gfx.setTextSize(1);
                 gfx.setTextWrap(false);
                 gfx.setTextColor(COL_TEXT);
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
+                gfx.setFont(&FreeSansBold9pt7b);
+                gfx.setTextSize(1);
                 gfx.setCursor(50, 120);
+#else
+                gfx.setFont(nullptr);
+                gfx.setTextSize(1);
+                gfx.setCursor(26, 56);    // centered on 160×128
+#endif
                 gfx.print("Setting up WiFi...");
                 gfx.setFont(nullptr);
             }
@@ -452,7 +463,8 @@ void ScreenKeyboard::_drawHeader() {
 
     gfx.fillRect(0, 0, TFT_WIDTH, KB_HDR_H, COL_BG);
 
-    // Prompt label
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
+    // Prompt label — 9pt bold font
     gfx.setFont(&FreeSansBold9pt7b);
     gfx.setTextSize(1);
     gfx.setTextWrap(false);
@@ -462,6 +474,18 @@ void ScreenKeyboard::_drawHeader() {
 
     // Input buffer content
     gfx.setCursor(4, 40);
+#else
+    // Prompt label — small bitmap font for 128×160
+    gfx.setFont(nullptr);
+    gfx.setTextSize(1);
+    gfx.setTextWrap(false);
+    gfx.setTextColor(COL_PROMPT);
+    gfx.setCursor(2, 1);
+    gfx.print(_prompt);
+
+    // Input buffer content
+    gfx.setCursor(2, 12);
+#endif
     gfx.setTextColor(COL_INPUT);
     gfx.print(_buf);
 
@@ -514,7 +538,11 @@ void ScreenKeyboard::_drawButton(uint8_t idx, bool focused) {
     gfx.setTextColor(COL_TEXT);
 
     uint8_t labelLen = static_cast<uint8_t>(strlen(key.label));
+#if TFT_DRIVER_TYPE == DISPLAY_DRIVER_ST7789
     uint8_t tsize    = (labelLen <= 3) ? 2 : 1;  // size 2 for ≤3 chars, 1 for 4-char labels
+#else
+    uint8_t tsize    = 1;                         // ST7735: bitmap size 1 for all labels
+#endif
     gfx.setTextSize(tsize);
 
     // Pixel size of one character at the chosen text size

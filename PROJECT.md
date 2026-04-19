@@ -12,7 +12,12 @@ The hardware consists of:
 - One 24 V radial fan with a filter for recirculation filtering
 - One 12 V fan under the bed to move more heat from under the bed
 
-All fans are 4-pin.
+Each fan can be **4-pin** (PWM + tach), **3-pin** (tach only, speed via
+MOSFET), or **2-pin** (no tach, speed via MOSFET). The fan type for each
+fan is configurable in the per-fan settings submenu. 2-pin and 3-pin fans
+require an external N-channel MOSFET on the power line for speed control
+and use a lower configurable PWM frequency (default 100 Hz). 4-pin fans
+use the standard 25 kHz PWM signal.
 
 ## Temperature Sensors
 
@@ -31,10 +36,11 @@ The under-bed sensor is used to:
   - One 24 V -> 12 V converter for the under-bed fan
 - ESP32 board
 - TFT + encoder + button module, with one extra button in addition to the button integrated into the encoder
-  - Current configured driver in firmware: `ST7789`
-  - Current configured logical resolution: `320x240`
-  - Current configured controller init size: `240x320`
-  - Current configured rotation: `3`
+  - Supported drivers: `ST7789` (320×240) and `ST7735` (128×160)
+  - Current configured driver in firmware: `ST7735`
+  - Current configured logical resolution (post-rotation): `160x128`
+  - Current configured controller init size: `128x160`
+  - Current configured rotation: `1`
   - Current configured inversion: `invertDisplay(false)`
 
 ## UI
@@ -43,7 +49,8 @@ The under-bed sensor is used to:
 - The first menu level functions as the main display screen.
 - The main display should show the live system status using read-only menu items.
 - Settings are accessed from the same top-level menu structure.
-- The bottom `80 px` of the screen are reserved for a large custom status footer.
+- The bottom of the screen is reserved for a large custom status footer
+  (`80 px` on ST7789, `30 px` on ST7735).
 - At boot, the root screen opens with `Settings` selected.
 - The read-only status rows above `Settings` remain visible but are not intended as selectable navigation targets.
 - Errors should first be implemented using a small status indicator such as a title widget or similar TcMenu-supported indicator.
@@ -73,6 +80,7 @@ Planned wiring between the TFT + encoder module and the ESP32 (`az-delivery-devk
 - Under-bed fan tach -> ESP32 `GPIO39`
 - Chamber temperature sensor (DS18B20) -> ESP32 `GPIO19` (separate 1-Wire bus)
 - Under-bed temperature sensor (DS18B20) -> ESP32 `GPIO22` (separate 1-Wire bus)
+- Chamber light (24 V LED via MOSFET) -> ESP32 `GPIO5`
 
 Notes:
 
@@ -99,22 +107,26 @@ Describe how the firmware should behave.
 `RO` = read-only
 
 - Main screen
-  - Operating mode: `IDLE` / `RECIRC` / `HEAT` / `COOL` (`RO`)
+  - Operating mode: `IDLE` / `RECIRC` / `HEATING` / `COOLING` /
+    `MANUAL` (`RO`)
   - Under-bed temperature in C (`RO`)
   - Chamber temperature in C (`RO`)
-  - Under-bed fan speed % (`RO`) — same as "heater fan" in hot chamber settings
+  - Under-bed fan speed % (`RO`)
   - Recirculation fan speed % (`RO`)
   - Exhaust fan speed % (`RO`)
   - WiFi IP (`RO`) or `Not Connected`
+  - Fan RPM submenu (`RO`) — shows tach RPM for each fan;
+    2-pin fans display "2PIN/NA" instead of a numeric value
   - Large bottom status footer
-    - Mode shorthand plus chamber temperature, for example `COOL 27 C`
+    - Mode shorthand plus chamber temperature, e.g. `COOL 27 C`
     - White text with mode-dependent background color:
-      - `COOL`: blue
-      - `HEAT`: red
-      - `RECI`: teal
+      - `COOLING`: blue
+      - `HEATING`: red
+      - `RECIRC`: teal
       - `IDLE`: dark gray
+      - `MANUAL`: orange
 - Settings
-  - Operating mode: `HEAT` / `COOL` / `AUTO`
+  - Operating mode: `AUTO` / `HEATING` / `COOLING` / `MANUAL`
   - Mode decision time (default: 10 min)
   - Recirculation startup bed temperature in C (default: 45)
   - Recirculation fan start speed % (default: 30%)
@@ -127,30 +139,35 @@ Describe how the firmware should behave.
     - Exhaust fan max % (default: 100%)
     - Exhaust fan min speed % (default: 15%)
     - Recirculation fan speed % (default: 20%)
-    - Under-bed fan: OFF (not configurable, always off in COOLING)
     - Max cold chamber temperature (default: 38 C)
-    - PID `Kp` (default: 2.0)
-    - PID `Ki` (default: 0.5)
+  - Heating Fan Settings
+    - Heating Fan Present ON/OFF
+    - Fan Type: 2PIN / 3PIN / 4PIN
+    - Manual Speed %
+  - Exhaust Fan Settings
+    - Exhaust Fan Present ON/OFF
+    - Fan Type: 2PIN / 3PIN / 4PIN
+    - Manual Speed %
     - PID `Kd` (default: 1.0)
-  - Debug
-    - Debug Mode ON/OFF
-    - Debug chamber temp C
-    - Debug bed temp C
-    - Cooling PID
-      - PID `Kp`
-      - PID `Ki`
-      - PID `Kd`
-    - Network
-      - SSID 2.4G (text item, shows current SSID,
-        launches T9 keyboard on click)
-      - Password (text item, shows "Is set" / "Not set",
-        launches T9 keyboard on click)
-      - WiFi IP (`RO`)
-    - Manual Fan Control
-      - Manual Control ON/OFF
-      - Under-bed fan speed %
-      - Exhaust fan speed %
-      - Recirculation fan speed %
+    - PID `Ki` (default: 0.5)
+    - PID `Kp` (default: 2.0)
+  - Recirc Fan Settings
+    - Recirc Fan Present ON/OFF
+    - Fan Type: 2PIN / 3PIN / 4PIN
+    - Manual Speed %
+  - Manual Debug Sens Ctrl
+    - Manual Sensor Control ON/OFF
+    - Manual Chamber Temp C
+    - Manual Bed Temp C
+  - Network
+    - SSID 2.4G (text item, shows current SSID,
+      launches T9 keyboard on click)
+    - Password (text item, shows "Is set" / "Not set",
+      launches T9 keyboard on click)
+    - WiFi IP (`RO`)
+  - 2P/3P PWM Frequency (default: 100 Hz, range 0–1000)
+  - Logging Interval (default: 5 min)
+  - Chamber Light Present ON/OFF
 
 All setting changes must be persisted immediately when changed.
 
@@ -158,10 +175,11 @@ Boot-time runtime overrides:
 
 - `Debug Mode` is forced `OFF` at boot
 - `Manual Fan Control` is forced `OFF` at boot
+- `MANUAL` operating mode is reset to `AUTO` at boot
 
 ### Control Logic
 
-The software has four internal states:
+The software has five internal states:
 
 - `IDLE`: all fans off
   - Active when the bed temperature is below `Recirculation fan startup bed temp` (`RFSBT`)
@@ -175,9 +193,16 @@ The software has four internal states:
   - Activated from `RECIRCULATING` if the conditions for `HEATING` are not fulfilled
   - Remains active until the bed temperature falls below `RFSBT`, then the controller returns to `IDLE`
 
-State order:
+- `MANUAL`: all fans run at user-configured manual speeds
+  - Activated when operating mode is set to `MANUAL`
+  - Suspends the automatic state machine
+  - Returns to `IDLE` when operating mode is changed away from `MANUAL`
+
+State order (automatic modes):
 
 `IDLE` -> `RECIRCULATING` -> `HEATING` or `COOLING` -> `IDLE`
+
+`MANUAL` mode bypasses this sequence entirely.
 
 
 ## FAN CONTROL
@@ -191,21 +216,35 @@ State order:
 - If the chamber sensor fails, the exhaust fan runs at the configured `Exhaust fan max %` and an error message is displayed on the screen
 - Other fans are at this point run at speeds specified in the settings
 
-### 4-Pin PWM Fan Control Notes
+### Fan Control Notes
 
-- Standard 4-pin PWM fan wiring is:
-  - Pin 1 / black: `GND`
-  - Pin 2 / yellow: fan supply voltage
-  - Pin 3 / green: tachometer / RPM output
-  - Pin 4 / blue: PWM control input
-- The fan supply voltage must be provided directly from the correct power rail for that fan, such as `24 V` or `12 V`.
-- Speed control must be done on the PWM control pin, not by PWM-switching the power pin.
-- The PWM control signal target frequency is `25 kHz`, with an acceptable range of `21-28 kHz`.
-- `100%` PWM duty cycle commands maximum speed.
-- If no PWM signal is connected, the fan may run at full speed.
-- The tachometer output is open-collector and produces `2 pulses per revolution`.
-- The tachometer input needs a pull-up, either from the ESP32 input pull-up or from an external resistor.
-- A common ground between the ESP32 and each fan power supply is required.
+**4-pin fans** (standard PC PWM fan):
+- Pin 1 / black: `GND`
+- Pin 2 / yellow: fan supply voltage
+- Pin 3 / green: tachometer / RPM output (open-collector,
+  2 pulses/rev)
+- Pin 4 / blue: PWM control input
+- PWM frequency: `25 kHz` (21–28 kHz acceptable)
+- Speed control via PWM pin; do not PWM-switch the power pin
+- Tach input needs a pull-up (ESP32 internal or external resistor)
+
+**3-pin fans** (tach + power, no PWM pin):
+- Pin 1: `GND`
+- Pin 2: fan supply voltage (switched via N-channel MOSFET)
+- Pin 3: tachometer output
+- Speed control by PWM-switching the MOSFET on the power line
+- PWM frequency: configurable (default 100 Hz, set via
+  Settings → 2P/3P PWM Frequency)
+
+**2-pin fans** (power only, no tach):
+- Pin 1: `GND`
+- Pin 2: fan supply voltage (switched via N-channel MOSFET)
+- Speed control by PWM-switching the MOSFET on the power line
+- No RPM measurement possible — RPM display shows "2PIN/NA"
+- PWM frequency: same configurable frequency as 3-pin fans
+
+A common ground between the ESP32 and each fan power supply
+is required.
 
 ### Operating Mode Behavior
 
@@ -222,8 +261,16 @@ State order:
   - Enters `HEATING` mode immediately when selected, bypassing `RFSBT` and `MDT`
   - After `MDT` has passed, if bed temperature is below `RFSBT`, returns to `IDLE`
 - `COOL`:
-  - Enters `COOLING` mode immediately when selected, bypassing `RFSBT` and `MDT`
-  - After `MDT` has passed, if bed temperature is below `RFSBT`, returns to `IDLE`
+  - Enters `COOLING` mode immediately when selected, bypassing `RFSBT`
+    and `MDT`
+  - After `MDT` has passed, if bed temperature is below `RFSBT`,
+    returns to `IDLE`
+- `MANUAL`:
+  - Enters `MANUAL` state immediately, suspending the state machine
+  - All three fans run at the manual speed percentages configured in
+    each fan's settings submenu
+  - Returns to `IDLE` when operating mode is changed away from `MANUAL`
+  - Forced back to `AUTO` at boot
 
 ## DEBUGGING
   - when DEBUG is selected the sensor tempeatures are read from settings and not physical hardware, This allows testing without sensors connected.
@@ -236,27 +283,39 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 ## Current Status
 
 - Working:
-  - ESP32 firmware builds and uploads successfully with the current `ST7789` display configuration
-  - Main TcMenu-based UI is operational with top-level live status items and settings submenus
-  - TcMenu color theme is currently white text on black background with blue selection highlight
-  - The bottom `80 px` custom footer is working and uses per-mode background colors
+  - ESP32 firmware builds and uploads successfully
+  - Dual display support: ST7789 (320×240) and ST7735 (160×128
+    post-rotation)
+  - Resolution-dependent font/layout scaling for both displays
+  - Main TcMenu-based UI with top-level live status items and
+    settings submenus
+  - TcMenu color theme: white text on black, blue selection highlight
+  - Custom status footer with per-mode background colors (including
+    orange for MANUAL)
   - Root menu opens with `Settings` selected
-  - Extra hardware button is mapped as a dedicated back key
-  - Chamber and under-bed temperature handling, fan PWM output, tachometer measurement, and the automatic state machine are implemented
-  - Cooling exhaust fan PID control is implemented and PID values are configurable
-  - Debug mode allows simulated bed and chamber temperatures without sensors connected
-  - Manual fan override is available from the debug menu for all three fans
-  - Wi-Fi credentials are configured via full-screen T9 on-screen keyboard
-    (Settings → Debug → Network) and persisted to EEPROM
-  - SSID menu item displays the currently configured SSID;
-    password item shows "Is set" / "Not set"
-  - The ESP32 only supports 2.4 GHz WiFi (no 5 GHz)
-  - TcMenu's built-in text editor is blocked for network
-    items; the custom T9 keyboard is used instead
-  - Startup now forces debug mode and manual fan control off, avoiding stale manual outputs after reboot
-  - HTTP status page at `http://<device-ip>/` returns a plain-text
-    dump of all settings plus HOT.log and COLD.log contents (uses
-    built-in ESP32 WebServer library, no extra dependencies)
+  - Extra hardware button mapped as a dedicated back key
+  - Chamber and under-bed temperature handling, fan PWM output,
+    tachometer measurement, and automatic state machine
+  - Cooling exhaust fan PID control with configurable gains
+  - Fan type support: 2PIN, 3PIN, and 4PIN per fan, with
+    configurable 2P/3P PWM frequency (default 100 Hz)
+  - Fan RPM submenu at root level; 2-pin fans display "2PIN/NA"
+  - Per-fan settings submenus (Heating/Exhaust/Recirc Fan Settings)
+    with fan presence, fan type, and manual speed
+  - MANUAL operating mode for direct fan speed control
+  - Debug sensor simulation (Settings → Manual Debug Sens Ctrl)
+  - Wi-Fi credentials configured via full-screen T9 on-screen
+    keyboard (Settings → Network) and persisted to EEPROM
+  - SSID item displays current SSID; password shows
+    "Is set" / "Not set"
+  - ESP32 supports 2.4 GHz WiFi only
+  - TcMenu's built-in text editor blocked for network items;
+    custom T9 keyboard used instead
+  - Boot forces debug mode off, manual fan control off, and
+    MANUAL mode back to AUTO
+  - HTTP status page at `http://<device-ip>/` with settings dump
+    and log file contents
+  - Print job logging to LittleFS with configurable interval
 - In progress:
   - Real-hardware validation with fans and sensors connected
 - Not started:
@@ -319,7 +378,7 @@ If `RECIRCULATING` has started and the `MDT` timer is running, but the bed tempe
 - Debug mode replaces hardware sensor reads with values set in the Debug settings
   menu, allowing testing without sensors connected.
 - Wi-Fi credentials are entered via the on-screen T9 keyboard
-  (Settings → Debug → Network) and persisted to EEPROM.
+  (Settings → Network) and persisted to EEPROM.
   The ESP32 supports 2.4 GHz WiFi only.
 - The main status/footer update paths are split:
   - normal read-only menu status refresh runs at `500 ms`

@@ -58,6 +58,14 @@ void FanController::begin() {
                   _pwmPin, _ledcChannel, _tachPin);
 }
 
+void FanController::setFrequency(uint32_t freqHz) {
+    ledcSetup(_ledcChannel, freqHz, FAN_PWM_RESOLUTION);
+    // Re-apply current speed at new frequency
+    uint32_t duty = map(_speedPercent, 0, 100, 0, FAN_PWM_MAX_DUTY);
+    ledcWrite(_ledcChannel, duty);
+    Serial.printf("[Fan] Pin %d freq set to %lu Hz\n", _pwmPin, freqHz);
+}
+
 void FanController::setSpeed(uint8_t percent) {
     _speedPercent = constrain(percent, 0, 100);
     uint32_t duty = map(_speedPercent, 0, 100, 0, FAN_PWM_MAX_DUTY);

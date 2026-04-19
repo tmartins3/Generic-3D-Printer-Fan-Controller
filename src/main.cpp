@@ -119,6 +119,7 @@ static void taskUpdateDisplayStatus() {
                      heatingFan.getSpeedPercent(),
                      recircFan.getSpeedPercent(),
                      exhaustFan.getSpeedPercent());
+    menuUpdateRpm(heatingFan.getRpm(), recircFan.getRpm(), exhaustFan.getRpm());
     menuSetWifiIpStatus(wifiManager.getStatusText());
 }
 
@@ -183,6 +184,18 @@ void wifiReconnect() {
 }
 
 // ============================================================
+// applyFanFrequencies — set PWM freq per fan type
+// ============================================================
+void applyFanFrequencies() {
+    uint32_t lowFreq  = gSettings.lowPinPwmFreqHz;
+    uint32_t highFreq = FAN_PWM_FREQ_HZ;  // 25 kHz for 4PIN
+
+    heatingFan.setFrequency(gSettings.debug.heatingFanType == FanType::Pin4 ? highFreq : lowFreq);
+    exhaustFan.setFrequency(gSettings.debug.exhaustFanType == FanType::Pin4 ? highFreq : lowFreq);
+    recircFan.setFrequency(gSettings.debug.recircFanType   == FanType::Pin4 ? highFreq : lowFreq);
+}
+
+// ============================================================
 // setup()
 // ============================================================
 void setup() {
@@ -198,9 +211,12 @@ void setup() {
     }
 
     // Always start with debug and manual fan override disabled, regardless of
-    // what was persisted previously.
+    // what was persisted previously. Reset MANUAL mode to AUTO on boot.
     gSettings.debug.debugMode = false;
     gSettings.debug.manualFanControl = false;
+    if (gSettings.operatingMode == OperatingMode::Manual) {
+        gSettings.operatingMode = OperatingMode::Auto;
+    }
 
     // Initialise sensors (first requestAll so the first update() has data)
     sensors.begin();
@@ -210,6 +226,9 @@ void setup() {
     exhaustFan.begin();
     recircFan.begin();
     heatingFan.begin();
+
+    // Apply PWM frequency based on fan type (2PIN/3PIN use lower freq)
+    applyFanFrequencies();
 
     // Initialise Wi-Fi independently from the control logic.
     wifiManager.begin();

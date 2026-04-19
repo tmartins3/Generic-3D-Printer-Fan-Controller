@@ -12,7 +12,7 @@
 
 // Magic key written at the start of EEPROM to detect valid data.
 // Change this value if you restructure the EEPROM layout to force a reset.
-#define SETTINGS_MAGIC  0xFC05   // bump when Settings layout changes
+#define SETTINGS_MAGIC  0xFC07   // bump when Settings layout changes
 
 // EEPROM base address used by settings (TcMenu occupies from this address)
 #define SETTINGS_EEPROM_BASE  2   // bytes 0-1 reserved for magic key
@@ -34,6 +34,15 @@ struct ColdChamberSettings {
     float    pidKd;                  // (default 1.0)
 };
 
+// Fan connector type — determines how speed control is applied.
+// 4PIN: PWM on dedicated control pin (standard).
+// 2PIN/3PIN: PWM switches the power supply via MOSFET.
+enum class FanType : uint8_t {
+    Pin2 = 0,
+    Pin3 = 1,
+    Pin4 = 2
+};
+
 struct DebugSettings {
     bool     debugMode;              // false = normal, true = use simulated temps
     float    debugChamberTemp;       // °C simulated chamber temperature
@@ -47,6 +56,9 @@ struct DebugSettings {
     bool     recircFanPresent;       // false = recirculation fan not installed
     bool     chamberLightPresent;    // false = chamber light not installed
     uint8_t  logIntervalMin;         // minutes between log rows (default 5)
+    FanType  heatingFanType;         // default: Pin4
+    FanType  exhaustFanType;         // default: Pin4
+    FanType  recircFanType;          // default: Pin4
 };
 
 struct NetworkSettings {
@@ -56,9 +68,10 @@ struct NetworkSettings {
 
 // Operating mode selected by the user in the Settings menu.
 enum class OperatingMode : uint8_t {
-    Auto = 0,
-    Heat = 1,
-    Cool = 2
+    Auto   = 0,
+    Heat   = 1,
+    Cool   = 2,
+    Manual = 3
 };
 
 class Settings {
@@ -70,6 +83,7 @@ public:
     uint8_t       recircStartSpeed;    // % (default 30)
 
     bool chamberLightOn;              // true = light relay/MOSFET is driven HIGH
+    uint16_t lowPinPwmFreqHz;         // PWM freq for 2PIN/3PIN fans (default 100)
 
     HotChamberSettings  hot;
     ColdChamberSettings cold;

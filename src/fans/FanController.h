@@ -29,6 +29,10 @@ public:
     // 0 % stops the fan (duty = 0).
     void setSpeed(uint8_t percent);
 
+    // Change the PWM frequency at runtime (for 2PIN/3PIN fans).
+    // Reconfigures the LEDC channel with the new frequency.
+    void setFrequency(uint32_t freqHz);
+
     // Return the last measured speed as a percentage (0–100).
     uint8_t getSpeedPercent() const { return _speedPercent; }
 

@@ -107,6 +107,17 @@ enum MenuItemId : menuid_t {
     ID_NET_SSID            = 59,
     ID_NET_PASSWORD        = 60,
     ID_NET_MENU            = 61,
+    ID_FAN_HEATING_MENU    = 62,
+    ID_FAN_EXHAUST_MENU    = 63,
+    ID_FAN_RECIRC_MENU     = 64,
+    ID_RPM_MENU            = 65,
+    ID_RPM_HEATING         = 66,
+    ID_RPM_RECIRC          = 67,
+    ID_RPM_EXHAUST         = 68,
+    ID_FAN_TYPE_HEATING    = 69,
+    ID_FAN_TYPE_EXHAUST    = 70,
+    ID_FAN_TYPE_RECIRC     = 71,
+    ID_LOW_PIN_PWM_FREQ    = 72,
 };
 
 // ---------------------------------------------------------------------------
@@ -126,6 +137,7 @@ void menuUpdateStatus(uint8_t  stateModeIndex,   // 0=IDLE 1=RECIRC 2=HEAT 3=COO
                       uint8_t  exhaustFanPct);
 
 void menuUpdateFooterStatus(uint8_t stateModeIndex, float chamberTempC);
+void menuUpdateRpm(uint16_t heatingRpm, uint16_t recircRpm, uint16_t exhaustRpm);
 
 void menuSetWifiIpStatus(const char* wifiStatusText);
 uint8_t menuGetConfiguredOperatingModeIndex();
@@ -144,3 +156,4 @@ void onSettingChanged(int id);
 
 // Called from keyboard done callback to reconnect WiFi
 extern void wifiReconnect();
+extern void applyFanFrequencies();

@@ -48,8 +48,16 @@ based on the bed temperature as a proxy for what the printer is doing.
 | **Recirculation fan** | Circulates air inside the chamber without venting outside | Typically a 24 V radial fan with a HEPA/carbon filter |
 
 Any of the three can be omitted. Enable or disable each fan under
-**Settings → Debug → [Fan name] Present**. When a fan is marked as not present
-the controller will not drive it and related menu items are hidden.
+**Settings → [Fan name] Fan Settings → [Fan] Present**. When a fan is
+marked as not present the controller will not drive it and related menu
+items are hidden.
+
+Each fan can be configured as **4-pin** (standard PWM + tach), **3-pin**
+(tach only, MOSFET speed control), or **2-pin** (no tach, MOSFET speed
+control). Fan type is set per fan under Settings → [Fan] Fan Settings →
+Fan Type. 2-pin and 3-pin fans use a configurable lower PWM frequency
+(default 100 Hz, set under Settings → 2P/3P PWM Frequency). 2-pin fans
+cannot report RPM and show "2PIN/NA" in the RPM submenu.
 
 ---
 
@@ -103,22 +111,19 @@ Returns to IDLE after MDT has elapsed *and* bed temperature has fallen below
 
 #### COOLING (forced)
 
-Same as forced HEATING but for cooling mode. Useful for PLA/PETG prints where
-you want exhaust running immediately.
+Same as forced HEATING but for cooling mode. Useful for PLA/PETG prints
+where you want exhaust running immediately.
 
----
+#### MANUAL
 
-### Manual Fan Control
+Overrides all automatic control. Each fan runs at the manual speed
+percentage configured in its fan settings submenu (Settings → [Fan]
+Fan Settings → Manual Speed). The state machine is suspended while
+MANUAL mode is active. Useful for testing fan wiring, benchmarking
+noise, or temporarily forcing airflow.
 
-**Settings → Debug → Manual Fan Control → Manual Control: ON**
-
-Overrides all automatic control. Each fan can be set to any speed (0–100 %)
-independently. The state machine is suspended while manual control is active.
-Useful for testing fan wiring, benchmarking noise, or temporarily forcing
-airflow without changing operating mode.
-
-Manual control is **forced off at every boot** to prevent accidentally leaving
-fans in a stuck state after a reboot.
+MANUAL mode is **reset to AUTO at every boot** to prevent accidentally
+leaving fans in a stuck state after a reboot.
 
 ---
 
@@ -155,7 +160,7 @@ jobs. Each new completed job overwrites the previous log of the same type.
 10;HEATING;68.1;35.2;1200;300;1800
 ```
 
-**Logging interval** is configured under **Settings → Debug → Logging
+**Logging interval** is configured under **Settings → Logging
 Interval** (1–60 min, default 5 min).
 
 **Maximum file size** is 128 KB per file (~52 hours at 1-minute intervals).
@@ -185,7 +190,7 @@ When WiFi is connected, the controller serves a plain-text status page at
 
 If a log file does not exist, `LOGFILE NOT PRESENT` is shown in its place.
 
-The device IP is displayed on the menu screen under **Settings → Debug →
+The device IP is displayed on the menu screen under **Settings →
 Network → WiFi IP** and printed to serial at boot.
 
 No additional libraries are required — the web server uses the built-in
@@ -211,11 +216,11 @@ respects.
 | Microcontroller | ESP32 (az-delivery-devkit-v4 or pin-compatible) | Any ESP32 dev board with the same GPIO layout will work |
 | Display + input module | TFT colour display with rotary encoder and 2 buttons | Common combined modules sold for Arduino/ESP32 |
 | TFT controller | ST7789 (320×240) or ST7735 (128×160) | Set in `include/Config.h` |
-| Exhaust/cooling fan | 24 V, 4-pin PWM | Radial blower recommended; add a filter for particle capture |
-| Recirculation fan | 24 V, 4-pin PWM | Radial blower with HEPA/carbon filter recommended |
-| Heating fan | 12 V, 4-pin PWM | Axial or radial fan mounted below or beside the print bed |
+| Exhaust/cooling fan | 24 V, 2/3/4-pin | Radial blower recommended |
+| Recirculation fan | 24 V, 2/3/4-pin | With HEPA/carbon filter |
+| Heating fan | 12 V, 2/3/4-pin | Below or beside the print bed |
 | Chamber LED strip | 24 V LED strip | Switched via N-channel MOSFET |
-| N-channel MOSFET | Logic-level, e.g. IRLZ44N | Vgs(th) ≤ 4.5 V; works at 3.3 V |
+| N-channel MOSFET | Logic-level, e.g. IRLZ44N | One for chamber light; one per 2/3-pin fan |
 | Chamber temp sensor | DS18B20 | Waterproof probe version recommended; mount away from direct airflow |
 | Bed temp sensor | DS18B20 | Mount outside the fan airflow, on the underside of the bed or frame |
 | Step-down converter | 24 V → 5 V, ≥1 A | Powers ESP32 and display |
@@ -270,23 +275,43 @@ GND ──────────► all GND rails (ESP32, converters, fans) �
 > GPIO34, GPIO35, and GPIO39 are input-only on ESP32 — they cannot be used
 > for output. This makes them ideal for tachometer inputs.
 
-#### 4-Pin PWM Fan Pinout
+#### Fan Pinouts
 
-Standard PC fan 4-pin connector, looking into the fan header:
+**4-pin PWM fan** (standard PC fan connector):
 
 | Pin | Colour | Signal |
 |-----|--------|--------|
 | 1 | Black | GND |
-| 2 | Yellow | Fan supply voltage (12 V or 24 V) |
-| 3 | Green | Tachometer output (open-collector, 2 pulses/rev) |
-| 4 | Blue | PWM input (25 kHz, 3.3 V logic is accepted by most fans) |
+| 2 | Yellow | Fan supply voltage (12/24 V) |
+| 3 | Green | Tachometer (open-collector, 2 pulses/rev) |
+| 4 | Blue | PWM input (25 kHz) |
 
-> Speed control is done via the PWM pin (pin 4). Do **not** PWM-switch the
-> supply voltage (pin 2) — this can damage the fan motor.
->
-> The tachometer output (pin 3) is open-collector. Connect a 4.7 kΩ pull-up
-> resistor from the tach pin to 3.3 V. The ESP32 internal pull-up alone is
-> sufficient in most cases and no external resistor is needed.
+> Speed control via PWM pin (pin 4). Do **not** PWM-switch
+> the supply voltage — this can damage the fan motor.
+> Tach needs a 4.7 kΩ pull-up to 3.3 V (ESP32 internal
+> pull-up is usually sufficient).
+
+**3-pin fan** (tach + power, no dedicated PWM pin):
+
+| Pin | Colour | Signal |
+|-----|--------|--------|
+| 1 | Black | GND |
+| 2 | Red | Fan supply voltage (via MOSFET) |
+| 3 | Yellow | Tachometer (open-collector, 2 pulses/rev) |
+
+> Speed control by PWM-switching an N-channel MOSFET on the
+> supply line. Default PWM frequency: 100 Hz (configurable
+> under Settings → 2P/3P PWM Frequency).
+
+**2-pin fan** (power only):
+
+| Pin | Colour | Signal |
+|-----|--------|--------|
+| 1 | Black | GND |
+| 2 | Red | Fan supply voltage (via MOSFET) |
+
+> Same MOSFET speed control as 3-pin. No RPM measurement —
+> the controller displays "2PIN/NA" for these fans.
 
 #### Chamber Light MOSFET Wiring
 
@@ -359,8 +384,8 @@ cd Generic-3D-Printer-Fan-Controller
 ### 2. Configure WiFi (on device)
 
 WiFi credentials are entered on the device itself using a full-screen
-T9-style on-screen keyboard. Navigate to **Settings → Debug → Network**
-and select **SSID 2.4G** or **Password**. The SSID item shows the
+T9-style on-screen keyboard. Navigate to **Settings → Network** and
+select **SSID 2.4G** or **Password**. The SSID item shows the
 currently configured network name; the password item shows "Is set" or
 "Not set" (the actual password is never displayed).
 
@@ -409,7 +434,7 @@ All settings are persisted to flash immediately when changed.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Operating Mode | AUTO | AUTO / HEATING / COOLING |
+| Operating Mode | AUTO | AUTO / HEATING / COOLING / MANUAL |
 | Mode Decision Time | 10 min | How long the controller recirculates before choosing HEATING or COOLING |
 | Startup Bed Temp | 45 °C | Bed temperature that triggers the start of recirculation |
 | Start Recirc Fan Speed | 30 % | Recirculation fan speed during the decision period |
@@ -432,23 +457,58 @@ All settings are persisted to flash immediately when changed.
 | Recirculation Fan | 20 % | Recirc fan speed in COOLING mode |
 | Max Chamber Temp | 38 °C | PID setpoint — target chamber temperature in COOLING mode |
 
-### Debug Settings
+### Per-Fan Settings
+
+Each fan has its own settings submenu under Settings.
+
+**Heating Fan Settings:**
 
 | Setting | Description |
 |---------|-------------|
-| Manual Sensor Control → Debug Mode | Replaces sensor readings with the values below |
-| Manual Sensor Control → Debug Chamber Temp | Simulated chamber temperature |
-| Manual Sensor Control → Debug Bed Temp | Simulated bed temperature |
-| Manual Fan Control → Manual Control | Overrides all fan outputs |
-| Manual Fan Control → Heating / Exhaust / Recirc Fan Speed | Manual fan speed % |
-| Cooling PID → Kp / Ki / Kd | PID gains for exhaust fan in COOLING mode (default 2.0 / 0.5 / 1.0) |
-| Heating Fan Present | Mark heating fan as installed or not |
-| Exhaust Fan Present | Mark exhaust fan as installed or not |
-| Recirc Fan Present | Mark recirculation fan as installed or not |
-| Logging Interval | 1–60 min interval for log rows (default 5 min) |
-| Network → SSID 2.4G | Current WiFi SSID (click to edit via T9 keyboard) |
-| Network → Password | Shows "Is set" / "Not set" (click to edit via T9 keyboard) |
-| Network → WiFi IP | Current IP address (read-only) |
+| Heating Fan Present | Mark as installed or not |
+| Fan Type | 2PIN / 3PIN / 4PIN |
+| Manual Speed | Fan speed % in MANUAL mode |
+
+**Exhaust Fan Settings:**
+
+| Setting | Description |
+|---------|-------------|
+| Exhaust Fan Present | Mark as installed or not |
+| Fan Type | 2PIN / 3PIN / 4PIN |
+| Manual Speed | Fan speed % in MANUAL mode |
+| PID Kd / Ki / Kp | PID gains for COOLING mode |
+
+**Recirc Fan Settings:**
+
+| Setting | Description |
+|---------|-------------|
+| Recirc Fan Present | Mark as installed or not |
+| Fan Type | 2PIN / 3PIN / 4PIN |
+| Manual Speed | Fan speed % in MANUAL mode |
+
+### Other Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| 2P/3P PWM Frequency | 100 Hz | PWM freq for 2-pin and 3-pin fans (0–1000) |
+| Logging Interval | 5 min | Log row interval (1–60 min) |
+| Chamber Light Present | ON | Mark chamber light as installed |
+
+### Manual Debug Sens Ctrl
+
+| Setting | Description |
+|---------|-------------|
+| Manual Sensor Control | ON/OFF — replaces sensor reads with values below |
+| Manual Chamber Temp | Simulated chamber temperature |
+| Manual Bed Temp | Simulated bed temperature |
+
+### Network
+
+| Setting | Description |
+|---------|-------------|
+| SSID 2.4G | Current WiFi SSID (T9 keyboard) |
+| Password | "Is set" / "Not set" (T9 keyboard) |
+| WiFi IP | Current IP address (read-only) |
 
 ---
 
@@ -492,8 +552,9 @@ press the back button (K0) to go up a level.
 |------|--------------|-------|
 | IDLE | Dark grey | `IDLE` |
 | RECIRCULATING | Teal | `RECIRC` |
-| HEATING | Red | `HEATING` or `HOT` if no heating fan |
-| COOLING | Blue | `COOLING` or `COOL` if no exhaust fan |
+| HEATING | Red | `HEATING` or `HOT` |
+| COOLING | Blue | `COOLING` or `COOL` |
+| MANUAL | Orange | `MANUAL` |
 
 The footer shows the current mode label and chamber temperature, for example:
 `COOLING 34 C`
