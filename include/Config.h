@@ -48,7 +48,7 @@
 #define PIN_ENC_A     32   // Encoder channel A (interrupt-capable, required by TcMenu)
 #define PIN_ENC_B     33   // Encoder channel B
 #define PIN_ENC_BTN   25   // Encoder push button
-#define PIN_BTN_K0    26   // Extra button K0 (currently unused)
+#define PIN_BTN_K0    26   // Extra button K0 (TcMenu back button)
 
 // --- Fans (PWM output + tachometer input) ------------------------------------
 #define PIN_EXHAUST_PWM    27

@@ -25,8 +25,13 @@ public:
     // Set up LEDC PWM output and attach the tach interrupt.
     void begin();
 
+    // Mark this fan as present or absent. When not present,
+    // setSpeed() is a no-op and getRpm() returns 0.
+    void setPresent(bool present) { _present = present; }
+    bool isPresent() const { return _present; }
+
     // Set fan speed. percent is clamped to [0, 100].
-    // 0 % stops the fan (duty = 0).
+    // 0 % stops the fan (duty = 0). No-op if fan is not present.
     void setSpeed(uint8_t percent);
 
     // Change the PWM frequency at runtime (for 2PIN/3PIN fans).
@@ -34,10 +39,10 @@ public:
     void setFrequency(uint32_t freqHz);
 
     // Return the last measured speed as a percentage (0–100).
-    uint8_t getSpeedPercent() const { return _speedPercent; }
+    uint8_t getSpeedPercent() const { return _present ? _speedPercent : 0; }
 
     // Return the last measured RPM (updated every TACH_MEASURE_MS).
-    uint16_t getRpm() const { return _rpm; }
+    uint16_t getRpm() const { return _present ? _rpm : 0; }
 
     // Call this from a periodic TaskManager task every TACH_MEASURE_MS.
     // Computes RPM from the pulse counter and resets it.
@@ -53,4 +58,5 @@ private:
     uint8_t  _ledcChannel;
     uint8_t  _speedPercent;
     uint16_t _rpm;
+    bool     _present;
 };

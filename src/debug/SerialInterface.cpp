@@ -104,6 +104,9 @@ void SerialInterface::_cmdHelp() {
     Serial.println(" set mdt       <minutes>      mode decision time");
     Serial.println(" set rfsbt     <°C>           recirc start bed temp");
     Serial.println(" set threshold <°C>           hot chamber bed threshold");
+    Serial.println(" set hfp       on|off         heating fan present");
+    Serial.println(" set efp       on|off         exhaust fan present");
+    Serial.println(" set rfp       on|off         recirc fan present");
     Serial.println(" set light     on|off         chamber light");
     Serial.println(" log list                     list log files");
     Serial.println(" log fetch hot|cold|active    stream log file to serial");
@@ -117,8 +120,8 @@ void SerialInterface::_cmdHelp() {
 void SerialInterface::_cmdStatus() {
     const bool dbg = gSettings.debug.debugMode;
 
-    float bed     = dbg ? gSettings.debug.debugBedTemp     : _sensors->getBedTemp();
-    float chamber = dbg ? gSettings.debug.debugChamberTemp : _sensors->getChamberTemp();
+    float bed     = _sensors->getEffectiveBedTemp();
+    float chamber = _sensors->getEffectiveChamberTemp();
 
     Serial.println("-----------------------------------------------------");
     Serial.printf(" State   : %s\n", controllerStateToString(_sm->getState()));
@@ -138,8 +141,7 @@ void SerialInterface::_cmdStatus() {
     Serial.printf(" Manual fans   : %s\n", gSettings.debug.manualFanControl ? "ON" : "OFF");
     Serial.printf(" Chamber light : %s\n", gSettings.chamberLightOn         ? "ON" : "OFF");
     Serial.printf(" Op mode       : %s\n",
-                  gSettings.operatingMode == OperatingMode::Auto    ? "AUTO" :
-                  gSettings.operatingMode == OperatingMode::Heat    ? "HEATING" : "COOLING");
+                  operatingModeToString(gSettings.operatingMode));
     Serial.println("-----------------------------------------------------");
 }
 
@@ -150,39 +152,7 @@ void SerialInterface::_cmdGet() {
     Serial.println("-----------------------------------------------------");
     Serial.println(" Settings");
     Serial.println("-----------------------------------------------------");
-    Serial.printf(" mode          : %s\n",
-                  gSettings.operatingMode == OperatingMode::Auto    ? "auto" :
-                  gSettings.operatingMode == OperatingMode::Heat    ? "heating" : "cooling");
-    Serial.printf(" mdt           : %d min\n",  gSettings.modeDecisionTimeMin);
-    Serial.printf(" rfsbt         : %d C\n",    gSettings.recircStartBedTemp);
-    Serial.printf(" recirc speed  : %d %%\n",   gSettings.recircStartSpeed);
-    Serial.println(" -- Hot chamber --");
-    Serial.printf(" heating fan   : %d %%\n",   gSettings.hot.heatingFanSpeed);
-    Serial.printf(" hot recirc    : %d %%\n",   gSettings.hot.recircFanSpeed);
-    Serial.printf(" hot exhaust   : %d %%\n",   gSettings.hot.exhaustFanSpeed);
-    Serial.printf(" threshold     : %d C\n",    gSettings.hot.bedTempThreshold);
-    Serial.println(" -- Cold chamber --");
-    Serial.printf(" exhaust max   : %d %%\n",   gSettings.cold.exhaustFanMax);
-    Serial.printf(" exhaust min   : %d %%\n",   gSettings.cold.exhaustFanMin);
-    Serial.printf(" cold recirc   : %d %%\n",   gSettings.cold.recircFanSpeed);
-    Serial.printf(" max chamber   : %d C\n",    gSettings.cold.maxChamberTemp);
-    Serial.printf(" PID Kp/Ki/Kd  : %.2f / %.2f / %.2f\n",
-                  gSettings.cold.pidKp, gSettings.cold.pidKi, gSettings.cold.pidKd);
-    Serial.println(" -- Debug --");
-    Serial.printf(" debug         : %s\n",  gSettings.debug.debugMode       ? "on" : "off");
-    Serial.printf(" chamber sim   : %.1f C\n", gSettings.debug.debugChamberTemp);
-    Serial.printf(" bed sim       : %.1f C\n", gSettings.debug.debugBedTemp);
-    Serial.printf(" manual        : %s\n",  gSettings.debug.manualFanControl ? "on" : "off");
-    Serial.printf(" manual heat   : %d %%\n",   gSettings.debug.manualHeatingFanSpeed);
-    Serial.printf(" manual exh    : %d %%\n",   gSettings.debug.manualExhaustFanSpeed);
-    Serial.printf(" manual rec    : %d %%\n",   gSettings.debug.manualRecircFanSpeed);
-    Serial.println(" -- Hardware presence --");
-    Serial.printf(" heating fan   : %s\n",  gSettings.debug.heatingFanPresent    ? "yes" : "no");
-    Serial.printf(" exhaust fan   : %s\n",  gSettings.debug.exhaustFanPresent    ? "yes" : "no");
-    Serial.printf(" recirc fan    : %s\n",  gSettings.debug.recircFanPresent     ? "yes" : "no");
-    Serial.printf(" chamber light : %s\n",  gSettings.debug.chamberLightPresent  ? "yes" : "no");
-    Serial.println(" -- Light --");
-    Serial.printf(" light         : %s\n",  gSettings.chamberLightOn             ? "on"  : "off");
+    gSettings.dump(Serial);
     Serial.println("-----------------------------------------------------");
 }
 
@@ -223,7 +193,13 @@ void SerialInterface::_cmdSet(const char* key, const char* value) {
     // --- manual fan control ---
     } else if (strcasecmp(key, "manual") == 0) {
         if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
-        gSettings.debug.manualFanControl = isOn(value);
+        if (isOn(value)) {
+            gSettings.debug.manualFanControl = true;
+            gSettings.operatingMode = OperatingMode::Manual;
+        } else {
+            gSettings.debug.manualFanControl = false;
+            gSettings.operatingMode = OperatingMode::Auto;
+        }
         menuSyncSettings();
         gSettings.save();
         _ok(gSettings.debug.manualFanControl ? "manual fan control ON"
@@ -294,6 +270,36 @@ void SerialInterface::_cmdSet(const char* key, const char* value) {
         menuSyncSettings();
         gSettings.save();
         Serial.printf("[Serial] OK  threshold = %d C\n", v);
+
+    // --- fan presence: heating ---
+    } else if (strcasecmp(key, "hfp") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.heatingFanPresent = isOn(value);
+        applyFanPresence();
+        applyFanPresenceToMenu();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.heatingFanPresent ? "heating fan present" : "heating fan absent");
+
+    // --- fan presence: exhaust ---
+    } else if (strcasecmp(key, "efp") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.exhaustFanPresent = isOn(value);
+        applyFanPresence();
+        applyFanPresenceToMenu();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.exhaustFanPresent ? "exhaust fan present" : "exhaust fan absent");
+
+    // --- fan presence: recirc ---
+    } else if (strcasecmp(key, "rfp") == 0) {
+        if (!isOn(value) && !isOff(value)) { _err("value must be on or off"); return; }
+        gSettings.debug.recircFanPresent = isOn(value);
+        applyFanPresence();
+        applyFanPresenceToMenu();
+        menuSyncSettings();
+        gSettings.save();
+        _ok(gSettings.debug.recircFanPresent ? "recirc fan present" : "recirc fan absent");
 
     // --- chamber light ---
     } else if (strcasecmp(key, "light") == 0) {

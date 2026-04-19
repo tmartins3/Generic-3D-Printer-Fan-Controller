@@ -1,5 +1,6 @@
 #include "TemperatureSensors.h"
 #include "../../include/Config.h"
+#include "../settings/Settings.h"
 
 // ---------------------------------------------------------------------------
 // TemperatureSensors.cpp
@@ -55,4 +56,14 @@ void TemperatureSensors::update() {
     if (!_bedOk) {
         Serial.println("[Temp] WARNING: Bed sensor read failed");
     }
+}
+
+float TemperatureSensors::getEffectiveChamberTemp() const {
+    return gSettings.debug.debugMode ? gSettings.debug.debugChamberTemp
+                                     : _chamberTemp;
+}
+
+float TemperatureSensors::getEffectiveBedTemp() const {
+    return gSettings.debug.debugMode ? gSettings.debug.debugBedTemp
+                                     : _bedTemp;
 }

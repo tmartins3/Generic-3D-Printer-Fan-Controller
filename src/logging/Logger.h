@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include "../control/StateMachine.h"   // ControllerState
+#include "../control/ControllerState.h"
 
 // ---------------------------------------------------------------------------
 // Logger.h
@@ -43,12 +43,14 @@ public:
     bool isJobActive() const { return _jobActive; }
 
 private:
-    void     _writeHeader();
+    // Returns true if the header was written successfully.
+    bool     _writeHeader();
     void     _writeRow(float bedC, float chamberC,
                        uint16_t recircRpm, uint16_t exhaustRpm,
                        uint16_t heatingRpm, ControllerState state);
     uint32_t _elapsedMin() const;
 
+    bool     _disabled     = false;  // true if LittleFS mount failed
     bool     _jobActive    = false;
     bool     _modeDecided  = false;
     bool     _isHot        = false;

@@ -50,7 +50,6 @@ void StateMachine::update() {
             _state = ControllerState::Manual;
             _mdtRunning = false;
             _pid.reset();
-            gSettings.debug.manualFanControl = true;
             Serial.println("[SM] -> MANUAL");
         }
         _heatingFan.setSpeed(gSettings.debug.manualHeatingFanSpeed);
@@ -59,9 +58,8 @@ void StateMachine::update() {
         return;
     }
 
-    // Leaving MANUAL mode — clear manual flag
+    // Leaving MANUAL mode — return to IDLE
     if (_state == ControllerState::Manual) {
-        gSettings.debug.manualFanControl = false;
         _enterIdle();
     }
 
@@ -73,8 +71,7 @@ void StateMachine::update() {
                           !gSettings.debug.debugMode;
 
     // When the chamber sensor fails in COOLING the exhaust fan runs at max.
-    if (_chamberSensorError && _state == ControllerState::Cooling
-                             && gSettings.debug.exhaustFanPresent) {
+    if (_chamberSensorError && _state == ControllerState::Cooling) {
         _exhaustFan.setSpeed(gSettings.cold.exhaustFanMax);
         Serial.println("[SM] Chamber sensor error — exhaust at max");
     }
@@ -187,7 +184,7 @@ void StateMachine::_enterIdle() {
 
 void StateMachine::_enterRecirculating() {
     _state = ControllerState::Recirculating;
-    _recircFan.setSpeed(gSettings.debug.recircFanPresent ? gSettings.recircStartSpeed : 0);
+    _recircFan.setSpeed(gSettings.recircStartSpeed);
     _exhaustFan.setSpeed(0);
     _heatingFan.setSpeed(0);
 
@@ -247,24 +244,20 @@ void StateMachine::_enterCooling() {
 // ---------------------------------------------------------------------------
 
 void StateMachine::_applyHeatingFanSpeeds() {
-    _exhaustFan.setSpeed(gSettings.debug.exhaustFanPresent  ? gSettings.hot.exhaustFanSpeed  : 0);
-    _recircFan.setSpeed(gSettings.debug.recircFanPresent    ? gSettings.hot.recircFanSpeed   : 0);
-    _heatingFan.setSpeed(gSettings.debug.heatingFanPresent  ? gSettings.hot.heatingFanSpeed  : 0);
+    _exhaustFan.setSpeed(gSettings.hot.exhaustFanSpeed);
+    _recircFan.setSpeed(gSettings.hot.recircFanSpeed);
+    _heatingFan.setSpeed(gSettings.hot.heatingFanSpeed);
 }
 
 void StateMachine::_applyCoolingFanSpeeds() {
     // Exhaust fan speed is PID-controlled (or max if sensor failed).
-    if (gSettings.debug.exhaustFanPresent) {
-        if (!_chamberSensorError) {
-            double pidOut = _pid.compute(_getChamberTemp());
-            _exhaustFan.setSpeed(static_cast<uint8_t>(pidOut));
-        } else {
-            _exhaustFan.setSpeed(gSettings.cold.exhaustFanMax);
-        }
+    if (!_chamberSensorError) {
+        double pidOut = _pid.compute(_getChamberTemp());
+        _exhaustFan.setSpeed(static_cast<uint8_t>(pidOut));
     } else {
-        _exhaustFan.setSpeed(0);
+        _exhaustFan.setSpeed(gSettings.cold.exhaustFanMax);
     }
-    _recircFan.setSpeed(gSettings.debug.recircFanPresent ? gSettings.cold.recircFanSpeed : 0);
+    _recircFan.setSpeed(gSettings.cold.recircFanSpeed);
     _heatingFan.setSpeed(0);  // Heating fan is OFF in COOLING
 }
 

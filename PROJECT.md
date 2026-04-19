@@ -274,7 +274,8 @@ is required.
 
 ## DEBUGGING
   - when DEBUG is selected the sensor tempeatures are read from settings and not physical hardware, This allows testing without sensors connected.
-  - Add debuginfo into serieal so that we can test that the encoder and buttons work as expected
+  - Add debuginfo into serial so that we can test that the encoder and buttons work as expected
+  - A full serial debug/control interface is available at 115200 baud for live status, settings changes, fan presence, manual override, operating mode, and log management
 
 ### Edge Case
 

@@ -30,6 +30,25 @@ static const size_t EEPROM_SIZE = sizeof(uint16_t) + sizeof(SettingsData);
 // Global instance
 Settings gSettings;
 
+const char* fanTypeToString(FanType type) {
+    switch (type) {
+        case FanType::Pin2: return "2PIN";
+        case FanType::Pin3: return "3PIN";
+        case FanType::Pin4: return "4PIN";
+        default:            return "UNKNOWN";
+    }
+}
+
+const char* operatingModeToString(OperatingMode mode) {
+    switch (mode) {
+        case OperatingMode::Auto:   return "AUTO";
+        case OperatingMode::Heat:   return "HEATING";
+        case OperatingMode::Cool:   return "COOLING";
+        case OperatingMode::Manual: return "MANUAL";
+        default:                    return "UNKNOWN";
+    }
+}
+
 // ---------------------------------------------------------------------------
 Settings::Settings() {
     applyDefaults();
@@ -130,4 +149,46 @@ void Settings::save() {
 void Settings::resetToDefaults() {
     applyDefaults();
     save();
+}
+
+void Settings::dump(Print& out) const {
+    out.printf(" mode          : %s\n", operatingModeToString(operatingMode));
+    out.printf(" mdt           : %d min\n",  modeDecisionTimeMin);
+    out.printf(" rfsbt         : %d C\n",    recircStartBedTemp);
+    out.printf(" recirc speed  : %d %%\n",   recircStartSpeed);
+    out.println(" -- Hot chamber --");
+    out.printf(" heating fan   : %d %%\n",   hot.heatingFanSpeed);
+    out.printf(" hot recirc    : %d %%\n",   hot.recircFanSpeed);
+    out.printf(" hot exhaust   : %d %%\n",   hot.exhaustFanSpeed);
+    out.printf(" threshold     : %d C\n",    hot.bedTempThreshold);
+    out.println(" -- Cold chamber --");
+    out.printf(" exhaust max   : %d %%\n",   cold.exhaustFanMax);
+    out.printf(" exhaust min   : %d %%\n",   cold.exhaustFanMin);
+    out.printf(" cold recirc   : %d %%\n",   cold.recircFanSpeed);
+    out.printf(" max chamber   : %d C\n",    cold.maxChamberTemp);
+    out.printf(" PID Kp/Ki/Kd  : %.2f / %.2f / %.2f\n",
+              cold.pidKp, cold.pidKi, cold.pidKd);
+    out.println(" -- Debug --");
+    out.printf(" debug         : %s\n",  debug.debugMode       ? "on" : "off");
+    out.printf(" chamber sim   : %.1f C\n", debug.debugChamberTemp);
+    out.printf(" bed sim       : %.1f C\n", debug.debugBedTemp);
+    out.printf(" manual        : %s\n",  debug.manualFanControl ? "on" : "off");
+    out.printf(" manual heat   : %d %%\n",  debug.manualHeatingFanSpeed);
+    out.printf(" manual exh    : %d %%\n",  debug.manualExhaustFanSpeed);
+    out.printf(" manual rec    : %d %%\n",  debug.manualRecircFanSpeed);
+    out.println(" -- Hardware --");
+    out.printf(" heating fan   : %s  type: %s\n",
+              debug.heatingFanPresent ? "yes" : "no",
+              fanTypeToString(debug.heatingFanType));
+    out.printf(" exhaust fan   : %s  type: %s\n",
+              debug.exhaustFanPresent ? "yes" : "no",
+              fanTypeToString(debug.exhaustFanType));
+    out.printf(" recirc fan    : %s  type: %s\n",
+              debug.recircFanPresent ? "yes" : "no",
+              fanTypeToString(debug.recircFanType));
+    out.printf(" chamber light : %s\n", debug.chamberLightPresent ? "yes" : "no");
+    out.printf(" 2P/3P PWM Hz  : %d\n", lowPinPwmFreqHz);
+    out.printf(" log interval  : %d min\n", debug.logIntervalMin);
+    out.println(" -- Light --");
+    out.printf(" light         : %s\n", chamberLightOn ? "on" : "off");
 }

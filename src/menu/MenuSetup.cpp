@@ -500,6 +500,9 @@ void menuSetup() {
     pinMode(PIN_TFT_BLK, OUTPUT);
     digitalWrite(PIN_TFT_BLK, HIGH);
 
+    // Give ScreenKeyboard a reference to the display (breaks circular dep)
+    ScreenKeyboard::setDisplay(gfx);
+
     // Configure renderer update rate
     renderer.setUpdatesPerSecond(10);
 
@@ -752,16 +755,8 @@ static bool _isTopLevelStatusItem(MenuItem* item) {
            item == &menuExhaustFan;
 }
 
-Adafruit_GFX& menuGetDisplay() {
-    return gfx;
-}
-
 void menuSetWifiIpStatus(const char* wifiStatusText) {
     menuWifiIp.setTextValue(wifiStatusText ? wifiStatusText : "Not Connected", true);
-}
-
-uint8_t menuGetConfiguredOperatingModeIndex() {
-    return static_cast<uint8_t>(menuOpMode.getCurrentValue());
 }
 
 // ===========================================================================
@@ -883,14 +878,17 @@ void onSettingChanged(int id) {
         case ID_DEBUG_HEATING_FAN:
             gSettings.debug.heatingFanPresent = menuDebugHeatingFan.getBoolean();
             applyFanPresenceToMenu();
+            applyFanPresence();
             break;
         case ID_DEBUG_EXHAUST_FAN:
             gSettings.debug.exhaustFanPresent = menuDebugExhaustFan.getBoolean();
             applyFanPresenceToMenu();
+            applyFanPresence();
             break;
         case ID_DEBUG_RECIRC_FAN:
             gSettings.debug.recircFanPresent = menuDebugRecircFan.getBoolean();
             applyFanPresenceToMenu();
+            applyFanPresence();
             break;
         case ID_DEBUG_CHAMBER_LIGHT:
             gSettings.debug.chamberLightPresent = menuDebugChamberLight.getBoolean();

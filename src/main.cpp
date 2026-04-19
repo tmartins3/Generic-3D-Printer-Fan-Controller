@@ -38,25 +38,6 @@ static StatusWebServer webServer;
 static bool webServerStarted = false;
 
 // ============================================================
-// Debug: print encoder and button events to serial
-// ============================================================
-static void debugPrintInputs() {
-    // TcMenu/IoAbstraction handles input internally.
-    // We hook in via the switches callback for direct button debug output.
-    // This is set up in debugSetupInputMonitor() below.
-}
-
-// Encoder change debug callback (registered after menuSetup)
-static void onDebugEncoderChange(int newValue) {
-    Serial.printf("[Debug] Encoder value: %d\n", newValue);
-}
-
-// Button event debug callback
-static void onDebugButtonEvent(uint8_t pin, bool held) {
-    Serial.printf("[Debug] Button pin %d %s\n", pin, held ? "HELD" : "PRESSED");
-}
-
-// ============================================================
 // Periodic task: read temperature sensors
 // Fires every TEMP_READ_INTERVAL_MS.
 // requestAll() starts a non-blocking conversion; update() reads the result
@@ -72,8 +53,8 @@ static void taskReadTemperatures() {
 // Periodic task: run state machine + update fan speeds
 // ============================================================
 static void taskUpdateControl() {
-    gSettings.operatingMode =
-        static_cast<OperatingMode>(menuGetConfiguredOperatingModeIndex());
+    // operatingMode is kept in sync by onSettingChanged(ID_OP_MODE) in the
+    // menu callback and by serial set commands — no per-tick re-read needed.
     stateMachine.update();
 }
 
@@ -99,19 +80,13 @@ static void taskUpdateDisplayStatus() {
     // Keyboard just closed — force immediate footer redraw
     if (_kbWasActive) {
         _kbWasActive = false;
-        float ct = gSettings.debug.debugMode
-                 ? gSettings.debug.debugChamberTemp
-                 : sensors.getChamberTemp();
-        menuUpdateFooterStatus(static_cast<uint8_t>(stateMachine.getState()), ct);
+        menuUpdateFooterStatus(static_cast<uint8_t>(stateMachine.getState()),
+                               sensors.getEffectiveChamberTemp());
     }
     uint8_t modeIdx = static_cast<uint8_t>(stateMachine.getState());
 
-    float bedTemp     = gSettings.debug.debugMode
-                      ? gSettings.debug.debugBedTemp
-                      : sensors.getBedTemp();
-    float chamberTemp = gSettings.debug.debugMode
-                      ? gSettings.debug.debugChamberTemp
-                      : sensors.getChamberTemp();
+    float bedTemp     = sensors.getEffectiveBedTemp();
+    float chamberTemp = sensors.getEffectiveChamberTemp();
 
     menuUpdateStatus(modeIdx,
                      bedTemp,
@@ -125,9 +100,7 @@ static void taskUpdateDisplayStatus() {
 
 static void taskUpdateFooter() {
     if (ScreenKeyboard::isActive()) return;   // keyboard owns the display
-    float chamberTemp = gSettings.debug.debugMode
-                      ? gSettings.debug.debugChamberTemp
-                      : sensors.getChamberTemp();
+    float chamberTemp = sensors.getEffectiveChamberTemp();
     menuUpdateFooterStatus(static_cast<uint8_t>(stateMachine.getState()), chamberTemp);
 }
 
@@ -135,12 +108,8 @@ static void taskUpdateFooter() {
 // Periodic task: log tick (fires every 60 s; Logger checks interval internally)
 // ============================================================
 static void taskLogTick() {
-    float bedC = gSettings.debug.debugMode
-               ? gSettings.debug.debugBedTemp
-               : sensors.getBedTemp();
-    float chamberC = gSettings.debug.debugMode
-                   ? gSettings.debug.debugChamberTemp
-                   : sensors.getChamberTemp();
+    float bedC     = sensors.getEffectiveBedTemp();
+    float chamberC = sensors.getEffectiveChamberTemp();
     logger.tick(bedC, chamberC,
                 recircFan.getRpm(), exhaustFan.getRpm(), heatingFan.getRpm(),
                 stateMachine.getState());
@@ -154,10 +123,8 @@ static void taskSerialStatus() {
                   "Exhaust=%d%%  Recirc=%d%%  Heating=%d%%  "
                   "ExhaustRPM=%d  RecircRPM=%d  HeatingRPM=%d%s\n",
                   controllerStateToString(stateMachine.getState()),
-                  gSettings.debug.debugMode ? gSettings.debug.debugBedTemp
-                                            : sensors.getBedTemp(),
-                  gSettings.debug.debugMode ? gSettings.debug.debugChamberTemp
-                                            : sensors.getChamberTemp(),
+                  sensors.getEffectiveBedTemp(),
+                  sensors.getEffectiveChamberTemp(),
                   exhaustFan.getSpeedPercent(),
                   recircFan.getSpeedPercent(),
                   heatingFan.getSpeedPercent(),
@@ -169,18 +136,21 @@ static void taskSerialStatus() {
 
 // ============================================================
 // wifiReconnect — called from menu after keyboard edits credentials
+// Non-blocking: starts connection attempt, poll task handles the rest.
 // ============================================================
 void wifiReconnect() {
     wifiManager.reconnect();
     menuSetWifiIpStatus(wifiManager.getStatusText());
-    if (wifiManager.isConnected() && !webServerStarted) {
-        webServer.begin();
-        taskManager.scheduleFixedRate(50,
-                                      [] { webServer.handleClient(); },
-                                      TIME_MILLIS);
-        webServerStarted = true;
-    }
-    Serial.printf("[WiFi] Reconnect: %s\n", wifiManager.getStatusText());
+    Serial.printf("[WiFi] Reconnect started: %s\n", wifiManager.getStatusText());
+}
+
+// ============================================================
+// applyFanPresence — sync fan present flags from settings
+// ============================================================
+void applyFanPresence() {
+    exhaustFan.setPresent(gSettings.debug.exhaustFanPresent);
+    recircFan.setPresent(gSettings.debug.recircFanPresent);
+    heatingFan.setPresent(gSettings.debug.heatingFanPresent);
 }
 
 // ============================================================
@@ -222,22 +192,17 @@ void setup() {
     sensors.begin();
     sensors.requestAll();
 
-    // Initialise fans
+    // Initialise fans and sync presence flags from settings
     exhaustFan.begin();
     recircFan.begin();
     heatingFan.begin();
+    applyFanPresence();
 
     // Apply PWM frequency based on fan type (2PIN/3PIN use lower freq)
     applyFanFrequencies();
 
-    // Initialise Wi-Fi independently from the control logic.
+    // Initialise Wi-Fi (non-blocking — poll task checks connection progress).
     wifiManager.begin();
-
-    // Start HTTP status server (only useful when WiFi is connected)
-    if (wifiManager.isConnected()) {
-        webServer.begin();
-        webServerStarted = true;
-    }
 
     // Initialise TcMenu display + encoder
     menuSetup();
@@ -299,12 +264,19 @@ void setup() {
     // Logger tick — fires every 60 s; Logger checks interval internally
     taskManager.scheduleFixedRate(60000, taskLogTick, TIME_MILLIS);
 
-    // HTTP server — poll for incoming requests
-    if (webServerStarted) {
-        taskManager.scheduleFixedRate(50,
-                                      [] { webServer.handleClient(); },
-                                      TIME_MILLIS);
-    }
+    // WiFi poll — checks connection progress and starts web server on connect
+    taskManager.scheduleFixedRate(500, [] {
+        if (wifiManager.poll()) {
+            // Just connected — start web server if not already running
+            if (!webServerStarted) {
+                webServer.begin();
+                taskManager.scheduleFixedRate(50,
+                                              [] { webServer.handleClient(); },
+                                              TIME_MILLIS);
+                webServerStarted = true;
+            }
+        }
+    }, TIME_MILLIS);
 
     Serial.println("[Boot] Setup complete — entering main loop");
 }

@@ -198,6 +198,40 @@ ESP32 `WebServer` library.
 
 ---
 
+### Serial Debug Interface
+
+A full interactive command interface is available over serial (115200 baud).
+Connect with any serial terminal or `pio device monitor`.
+
+| Command | Description |
+|---------|-------------|
+| `help` | List all commands |
+| `status` | Live state, temperatures, fan speeds, and flags |
+| `get` | Dump all current settings |
+| `set debug on\|off` | Enable/disable simulated sensor mode |
+| `set chamber <°C>` | Set simulated chamber temperature |
+| `set bed <°C>` | Set simulated bed temperature |
+| `set manual on\|off` | Enable/disable manual fan override |
+| `set heating <0-100>` | Manual heating fan speed % |
+| `set exhaust <0-100>` | Manual exhaust fan speed % |
+| `set recirc <0-100>` | Manual recirc fan speed % |
+| `set mode auto\|heating\|cooling` | Set operating mode |
+| `set mdt <min>` | Set mode decision time |
+| `set rfsbt <°C>` | Set recirculation start bed temperature |
+| `set threshold <°C>` | Set hot chamber bed threshold |
+| `set hfp on\|off` | Set heating fan present |
+| `set efp on\|off` | Set exhaust fan present |
+| `set rfp on\|off` | Set recirc fan present |
+| `set light on\|off` | Toggle chamber light |
+| `log list` | List log files with sizes |
+| `log fetch hot\|cold\|active` | Stream a log file to serial |
+| `log delete hot\|cold` | Delete a log file |
+
+All `set` commands persist changes immediately. The serial interface is
+also used by the automated test suite (`docs/testing/test_runner.py`).
+
+---
+
 ### Sensor Failure Handling
 
 If the chamber temperature sensor fails while in COOLING mode the exhaust fan

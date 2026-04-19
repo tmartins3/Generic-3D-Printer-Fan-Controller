@@ -23,10 +23,15 @@
 #include <Arduino.h>
 #include <BaseRenderers.h>   // RenderPressMode
 
+class Adafruit_GFX;   // forward declaration — avoids pulling in MenuSetup.h
+
 typedef void (*KeyboardDoneCallback)(bool accepted);
 
 class ScreenKeyboard {
 public:
+    // Set the display reference once (call from menuSetup before first use).
+    static void setDisplay(Adafruit_GFX& display) { _gfx = &display; }
+
     // Activate the keyboard.
     //   prompt  — label shown in header
     //   buf     — output buffer (pre-fill for editing an existing value)
@@ -75,4 +80,5 @@ private:
     static uint32_t _btnDownMs;     // millis() when button went down (for held detection)
     static bool     _pendingFinish; // waiting for buttons to release before giveBackDisplay
     static bool     _finishAccepted;// true=OK, false=ESC/cancel
+    static Adafruit_GFX* _gfx;     // display reference (set once via setDisplay)
 };

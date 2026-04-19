@@ -43,6 +43,8 @@ enum class FanType : uint8_t {
     Pin4 = 2
 };
 
+const char* fanTypeToString(FanType type);
+
 struct DebugSettings {
     bool     debugMode;              // false = normal, true = use simulated temps
     float    debugChamberTemp;       // °C simulated chamber temperature
@@ -74,6 +76,8 @@ enum class OperatingMode : uint8_t {
     Manual = 3
 };
 
+const char* operatingModeToString(OperatingMode mode);
+
 class Settings {
 public:
     // --- Top-level settings -------------------------------------------------
@@ -104,9 +108,26 @@ public:
     // Reset all settings to firmware defaults and save.
     void resetToDefaults();
 
+    // Dump all settings as formatted text to any Print stream
+    // (Serial, StringPrint, WebServer response, etc.).
+    void dump(Print& out) const;
+
 private:
     void applyDefaults();
 };
 
 // Global singleton — included by any file that needs access to settings.
 extern Settings gSettings;
+
+// Print adapter that appends to a String (for web server responses, etc.)
+class StringPrint : public Print {
+public:
+    StringPrint(String& s) : _s(s) {}
+    size_t write(uint8_t c) override { _s += (char)c; return 1; }
+    size_t write(const uint8_t* buf, size_t size) override {
+        _s.concat((const char*)buf, size);
+        return size;
+    }
+private:
+    String& _s;
+};

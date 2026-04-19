@@ -35,6 +35,11 @@ public:
     float getChamberTemp() const { return _chamberTemp; }
     float getBedTemp()     const { return _bedTemp; }
 
+    // Return the effective temperature, respecting debug mode.
+    // If debug mode is active, returns the simulated value from settings.
+    float getEffectiveChamberTemp() const;
+    float getEffectiveBedTemp()     const;
+
     // True if the most recent read returned a valid value.
     bool isChamberOk() const { return _chamberOk; }
     bool isBedOk()     const { return _bedOk; }

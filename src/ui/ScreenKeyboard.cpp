@@ -1,10 +1,14 @@
 #include "ScreenKeyboard.h"
 #include "../../include/Config.h"
-#include "../menu/MenuSetup.h"
 
 #include <Adafruit_GFX.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <tcMenu.h>
+#include <graphics/GraphicsDeviceRenderer.h>
+
+// renderer is defined in MenuSetup.cpp — we only need it for
+// takeOverDisplay/giveBackDisplay calls.
+extern tcgfx::GraphicsDeviceRenderer renderer;
 
 // ---------------------------------------------------------------------------
 // ScreenKeyboard.cpp
@@ -172,6 +176,7 @@ bool     ScreenKeyboard::_prevBtnDown     = false;
 uint32_t ScreenKeyboard::_btnDownMs      = 0;
 bool     ScreenKeyboard::_pendingFinish  = false;
 bool     ScreenKeyboard::_finishAccepted = false;
+Adafruit_GFX* ScreenKeyboard::_gfx      = nullptr;
 
 // ---------------------------------------------------------------------------
 // activate — entry point
@@ -225,7 +230,7 @@ void ScreenKeyboard::_renderCb(unsigned int encoderVal, RenderPressMode pressMod
         if (!encBtn && !backBtn) {
             // Show status message on OK before the callback runs
             if (_finishAccepted) {
-                Adafruit_GFX& gfx = menuGetDisplay();
+                Adafruit_GFX& gfx = *_gfx;
                 gfx.fillRect(0, 0, TFT_WIDTH, TFT_HEIGHT, COL_BG);
                 gfx.setTextWrap(false);
                 gfx.setTextColor(COL_TEXT);
@@ -459,7 +464,7 @@ void ScreenKeyboard::_finish(bool accepted) {
 // ---------------------------------------------------------------------------
 
 void ScreenKeyboard::_drawHeader() {
-    Adafruit_GFX& gfx = menuGetDisplay();
+    Adafruit_GFX& gfx = *_gfx;
 
     gfx.fillRect(0, 0, TFT_WIDTH, KB_HDR_H, COL_BG);
 
@@ -507,7 +512,7 @@ void ScreenKeyboard::_drawHeader() {
 }
 
 void ScreenKeyboard::_drawButton(uint8_t idx, bool focused) {
-    Adafruit_GFX& gfx = menuGetDisplay();
+    Adafruit_GFX& gfx = *_gfx;
 
     uint8_t col = idx % KB_COLS;
     uint8_t row = idx / KB_COLS;
@@ -560,7 +565,7 @@ void ScreenKeyboard::_drawButton(uint8_t idx, bool focused) {
 }
 
 void ScreenKeyboard::_drawAll() {
-    Adafruit_GFX& gfx = menuGetDisplay();
+    Adafruit_GFX& gfx = *_gfx;
 
     // Clear entire screen once on full redraw
     gfx.fillRect(0, 0, TFT_WIDTH, TFT_HEIGHT, COL_BG);

@@ -8,34 +8,58 @@
 //
 // Menu tree:
 //   Root ("FanController")
-//   ├── Mode         [enum RO]   IDLE / RECIRC / HEAT / COOL
-//   ├── Bed Temp     [analog RO] °C
-//   ├── Chamber      [analog RO] °C
-//   ├── Heating Fan  [analog RO] %
-//   ├── Recirc Fan   [analog RO] %
-//   ├── Exhaust Fan  [analog RO] %
-//   └── Settings     [submenu]
-//       ├── Op Mode        [enum]   AUTO / HEAT / COOL
-//       ├── Decision Time  [analog] min
-//       ├── Recirc Temp    [analog] °C
-//       ├── Recirc Speed   [analog] %
-//       ├── Hot Chamber    [submenu]
+//   ├── Mode           [enum RO]    IDLE / RECIRC / HEAT / COOL / MANUAL
+//   ├── Bed Temp       [analog RO]  °C
+//   ├── Chamber        [analog RO]  °C
+//   ├── Heating Fan    [analog RO]  %
+//   ├── Recirc Fan     [analog RO]  %
+//   ├── Exhaust Fan    [analog RO]  %
+//   ├── Chamber Light  [boolean]    ON / OFF
+//   ├── RPM            [submenu RO]
+//   │   ├── Heating RPM   [text RO]
+//   │   ├── Recirc RPM    [text RO]
+//   │   └── Exhaust RPM   [text RO]
+//   └── Settings       [submenu]
+//       ├── Op Mode          [enum]    AUTO / HEAT / COOL / MANUAL
+//       ├── Decision Time    [analog]  min
+//       ├── Recirc Temp      [analog]  °C
+//       ├── Recirc Speed     [analog]  %
+//       ├── Hot Chamber      [submenu]
 //       │   ├── Heating Fan Speed [analog] %
-//       │   ├── Recirc Speed  [analog] %
-//       │   ├── Exhaust Spd   [analog] %
-//       │   └── Bed Threshold [analog] °C
-//       ├── Cold Chamber   [submenu]
+//       │   ├── Recirc Speed      [analog] %
+//       │   ├── Exhaust Speed     [analog] %
+//       │   └── Bed Threshold     [analog] °C
+//       ├── Cold Chamber     [submenu]
 //       │   ├── Exhaust Max   [analog] %
 //       │   ├── Exhaust Min   [analog] %
 //       │   ├── Recirc Speed  [analog] %
-//       │   ├── Max Temp      [analog] °C
-//       │   ├── PID Kp        [analog] x.xx
-//       │   ├── PID Ki        [analog] x.xx
-//       │   └── PID Kd        [analog] x.xx
-//       └── Debug          [submenu]
-//           ├── Debug Mode    [boolean]
-//           ├── Chamber Temp  [analog] °C
-//           └── Bed Temp      [analog] °C
+//       │   └── Max Temp      [analog] °C
+//       ├── Heating Fan Settings [submenu]
+//       │   ├── Fan Present   [boolean]
+//       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   └── Manual Speed  [analog]  %
+//       ├── Exhaust Fan Settings [submenu]
+//       │   ├── Fan Present   [boolean]
+//       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   ├── Manual Speed  [analog]  %
+//       │   ├── PID Kp        [analog]  x.xx
+//       │   ├── PID Ki        [analog]  x.xx
+//       │   └── PID Kd        [analog]  x.xx
+//       ├── Recirc Fan Settings  [submenu]
+//       │   ├── Fan Present   [boolean]
+//       │   ├── Fan Type      [enum]    2PIN / 3PIN / 4PIN
+//       │   └── Manual Speed  [analog]  %
+//       ├── Manual Debug Sens Ctrl [submenu]
+//       │   ├── Debug Mode    [boolean]
+//       │   ├── Chamber Temp  [analog]  °C
+//       │   └── Bed Temp      [analog]  °C
+//       ├── Network          [submenu]
+//       │   ├── SSID 2.4G    [text, T9 keyboard]
+//       │   ├── Password      [text, T9 keyboard]
+//       │   └── WiFi IP       [text RO]
+//       ├── 2P/3P PWM Freq   [analog]  Hz
+//       ├── Logging Interval  [analog]  min
+//       └── Chamber Light Present [boolean]
 // ---------------------------------------------------------------------------
 
 #include <Arduino.h>
@@ -140,16 +164,11 @@ void menuUpdateFooterStatus(uint8_t stateModeIndex, float chamberTempC);
 void menuUpdateRpm(uint16_t heatingRpm, uint16_t recircRpm, uint16_t exhaustRpm);
 
 void menuSetWifiIpStatus(const char* wifiStatusText);
-uint8_t menuGetConfiguredOperatingModeIndex();
 void applyFanPresenceToMenu();
 
 // Re-sync all gSettings values back into the menu items.
 // Call this after changing gSettings from outside the menu (e.g. serial interface).
 void menuSyncSettings();
-
-// Returns a reference to the raw Adafruit_GFX display object.
-// Used by ScreenKeyboard to draw directly on the screen.
-Adafruit_GFX& menuGetDisplay();
 
 // Callback fired by TcMenu when the user confirms a setting change.
 void onSettingChanged(int id);
@@ -157,3 +176,4 @@ void onSettingChanged(int id);
 // Called from keyboard done callback to reconnect WiFi
 extern void wifiReconnect();
 extern void applyFanFrequencies();
+extern void applyFanPresence();

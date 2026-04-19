@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "ControllerState.h"
 #include "../fans/FanController.h"
 #include "../sensors/TemperatureSensors.h"
 #include "../settings/Settings.h"
@@ -10,25 +11,15 @@ class Logger;  // forward declaration — avoids circular include
 
 // ---------------------------------------------------------------------------
 // StateMachine.h
-// Implements the four-state fan controller logic:
+// Implements the five-state fan controller logic:
 //
 //   IDLE -> RECIRCULATING -> HEATING or COOLING -> IDLE
+//   MANUAL (bypasses automatic sequence)
 //
 // State transitions are driven by bed temperature and the Mode Decision
-// Timer (MDT). The operating mode setting (AUTO / HEAT / COOL) modifies
-// behaviour as described in the project spec.
+// Timer (MDT). The operating mode setting (AUTO / HEAT / COOL / MANUAL)
+// modifies behaviour as described in the project spec.
 // ---------------------------------------------------------------------------
-
-enum class ControllerState : uint8_t {
-    Idle          = 0,
-    Recirculating = 1,
-    Heating       = 2,
-    Cooling       = 3,
-    Manual        = 4
-};
-
-// Human-readable names for serial debug output.
-const char* controllerStateToString(ControllerState state);
 
 class StateMachine {
 public:

@@ -19,6 +19,7 @@ static const char* _stateStr(ControllerState s) {
 void Logger::begin() {
     if (!LittleFS.begin(true)) {
         Serial.println("[Log] LittleFS mount failed — logging disabled");
+        _disabled = true;
         return;
     }
     if (LittleFS.exists(PATH_ACTIVE)) {
@@ -29,15 +30,18 @@ void Logger::begin() {
 }
 
 void Logger::notifyJobStart() {
-    if (_jobActive) return;
-    _jobActive   = false;   // set true after header written
+    if (_disabled || _jobActive) return;
+    _jobActive   = false;
     _modeDecided = false;
     _isHot       = false;
     _truncated   = false;
     _forceWrite  = true;
     _jobStartMs  = millis();
     _lastWriteMs = 0;
-    _writeHeader();
+    if (!_writeHeader()) {
+        Serial.println("[Log] Failed to write header — job not started");
+        return;
+    }
     _jobActive   = true;
     Serial.println("[Log] Job started");
 }
@@ -80,20 +84,16 @@ void Logger::tick(float bedC, float chamberC,
     _writeRow(bedC, chamberC, recircRpm, exhaustRpm, heatingRpm, state);
 }
 
-void Logger::_writeHeader() {
+bool Logger::_writeHeader() {
     File f = LittleFS.open(PATH_ACTIVE, "w");
     if (!f) {
         Serial.println("[Log] Failed to open active.log for write");
-        return;
+        return false;
     }
     f.println("# FanController2 Print Log");
     f.printf("# Started: %lu min since boot\n", millis() / 60000UL);
 
-    // OperatingMode enum: Auto=0, Heat=1, Cool=2
-    const char* modeStr =
-        gSettings.operatingMode == OperatingMode::Auto ? "AUTO" :
-        gSettings.operatingMode == OperatingMode::Heat ? "HEATING" : "COOLING";
-    f.printf("# Op Mode: %s\n", modeStr);
+    f.printf("# Op Mode: %s\n", operatingModeToString(gSettings.operatingMode));
     f.printf("# MDT: %d min\n",               gSettings.modeDecisionTimeMin);
     f.printf("# RFSBT: %d C\n",               gSettings.recircStartBedTemp);
     f.printf("# Recirc Start Speed: %d %%\n", gSettings.recircStartSpeed);
@@ -114,6 +114,7 @@ void Logger::_writeHeader() {
     f.println("#");
     f.println("# min;mode;bedC;chamberC;recircRPM;exhaustRPM;heatingRPM");
     f.close();
+    return true;
 }
 
 void Logger::_writeRow(float bedC, float chamberC,
